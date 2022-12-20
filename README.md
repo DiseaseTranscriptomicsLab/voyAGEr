@@ -1,6 +1,6 @@
 # voyAGEr
 
-Free web interface for the analysis of age-related gene expression alterations in human tissues
+Free web interface for the analysis of age-related gene expression alterations in GTEx human tissues.
 
 Developed by Arthur Schneider
 
