@@ -44,7 +44,7 @@ shinyServer(
     p_Alterations <- reactive({
       gene <- input$gene
       variable <- input$variable_Gene_Alteration
-      validate(need(!is.null(gene) & gene != "", ""))
+      validate(need(!is.null(gene) & gene != "", "")) 
       tissue <- geneList$tissue[[match(gene, geneList$gene)]]
       modifiedTissuename <- gsub("-", "_", tissue)
       modifiedTissuename <- gsub(" ", "", modifiedTissuename)
@@ -143,14 +143,14 @@ shinyServer(
     })
 
     peak <- readRDS("data/peaks_plot_2.RDS") #to knwo the FDR for each peak for FDRvsAge
-    AgeWavesList <- readRDS("data/AgeWaves_acrossTissues_step0.5years.RDS")
+    AgeWavesList <- readRDS("data/FDR_Interpolation_Tissue.RDS")
     geneList <- readRDS("data/DT_NbTissuePerGene.RDS")
     donorCondition <- readRDS("data/donorCondition.RDS")
     conditionID <- readRDS("data/conditionID.RDS")
     technicalCondition <- readRDS("data/technicalCondition.RDS")
     Cluster_Reactome <- readRDS("data/Cluster_Reactome.RDS")
     Cluster_Reactome_affiliation <- readRDS("data/Reactome_cluster_Affiliation.RDS")
-    moduleInfo <- readRDS("data/moduleInfo_Atlas_v4.RDS")
+    moduleInfo <- readRDS("data/moduleInfo_Corrected_Atlas.RDS")
     # color2 <- c("#8DD3C7", "#FFFFB3", "#FB8072", "#80B1D3", "#FDB462", "#B3DE69", "#FCCDE5", "#D9D9D9", "#BC80BD", "#CCEBC5", "#FFED6F",
     #             "#7FC97F", "#BEAED4", "#FDC086", "#E6AB02", "#386CB0", "#A6761D", "#F0027F", "#BF5B17", "#666666", "#1B9E77", "#D95F02",
     #             "#7570B3", "#E7298A", "#66A61E", "#FFFF99", "#BEBADA")
@@ -186,13 +186,14 @@ shinyServer(
     observe({
       updatePickerInput(session, "gene",
                         choices =  as.character(geneList$gene)[order(as.character(geneList$gene))],
-                        selected = "BRCA1")
+                        selected = "CDKN2A")
     })
     observe({
-      gene <- as.character(input$gene)
+      gene <- as.character(req(input$gene))
 
       #Keep the selected tissue if the new gene is expressed in it
       #Otherwise, put the heatmpa wil all tissues
+ 
       if (input$tissue %in% as.character(geneList$tissue[[match(gene, geneList$gene)]]))
       {
         selected <- input$tissue
@@ -1392,6 +1393,12 @@ validate(need(nrow(moduleCellType[moduleCellType$module == module,]) !=0 , ""))
     	geneSearchedInModules()
     })
 
+    
+    
+    
+    
+    
+    
   }
 )
 

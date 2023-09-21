@@ -9,11 +9,19 @@ color2 <- function()
 
 Heatmap_log10FDRvsAge <- function(variable, AgeWaves)
 {
+   
   tmp <- AgeWaves[[variable]]
-  tmp[is.na(tmp)] <- 3
+  tmp[is.na(tmp)] <- 0#3 
   tmp[tmp < 0] <- 0
-  i <- (hclust(dist(tmp)))
+  tmp[sapply(tmp, is.infinite)] <- NA
+  maxtmp <- max(tmp, na.rm = T)
+  tmp[is.na(tmp)] <- maxtmp + 2 # to ease visualization, use Inf values as the maximum value + 2 (significant for sure)
+ 
+  #tmp <- as.matrix(tmp[order(row.names(tmp)), ])
   
+  #tmp[tmp < 0] <- 0
+  i <- (hclust(dist(tmp)))
+  #browser()
   tmp <- as.matrix(tmp[i$order, ])
   tmp <- melt(tmp)
   colnames(tmp) <- c("tissue", "age", "-log10(FDR)")

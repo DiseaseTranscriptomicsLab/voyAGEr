@@ -82,7 +82,7 @@ shinyUI(fluidPage(
                         sidebarPanel2(width = 3,
                                       pickerInput("gene", label = "Gene", 
                                                   choices = c("Loading ..." = ""), 
-                                                  options = list(`live-search` = TRUE), selected = "A1BG"),
+                                                  options = list(`live-search` = TRUE), selected = "CDKN2A"),
                                       pickerInput("tissue", label = "Tissue", 
                                                   choices = c("Loading ..." = ""), 
                                                   options = list(`live-search` = TRUE),
