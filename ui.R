@@ -30,10 +30,10 @@ shinyUI(fluidPage(
                       icon = icon(name = "home", class = "big_icon_test"),
                       mainPanel(width = 12,
                                 tabsetPanel(id = "home", type = "pills",
-                                            tabPanel("Results", 
+                                            tabPanel("Overview", 
                                                      icon = icon("comments"),
                                                      column(width = 12, style = "margin-bottom:50px",
-                                                            HTML('<center><img src="result.png" height="550"></center>')
+                                                            HTML('<center><img src="MainFigure.png" height="550"></center>')
                                                      ),
                                                      tags$footer(tags$a(href = 'http://imm.medicina.ulisboa.pt/group/distrans/',
                                                                         img(src = 'imm_logo.png', title = "Lab Webpage", height = "45px"), target = "blank"),
@@ -50,10 +50,10 @@ shinyUI(fluidPage(
                                                           background-color: #ecf0f1;
                                                           color: black;
                                                           text-align: center;")),
-                                            tabPanel("Method",
+                                            tabPanel("Methodology",
                                                      icon = icon("cogs"),
                                                      column(width = 12, style = "margin-bottom:50px",
-                                                            HTML('<center><img src="method.png" height="400"></center>'),
+                                                            HTML('<center><img src="methodology.png" height="400"></center>'),
                                                             HTML("<font size='4'><br>Our shifting age range pipeline for linear modelling (ShARP-LM) consists in carrying out tissue-specific differential gene expression analyses across samples in age windows spanning 16 years centred in consecutive years of age. 
                                                        <br>For each window, the gene expression is linearly modelled considering the age, sex and age-sex interaction effects.
                                                        <br>The derived statistics enable to identify the age periods when major gene expression changes occur due to which of the 3 effects and to evaluate their functional enrichment.</font>")
