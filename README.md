@@ -4,6 +4,4 @@ Free web interface for the analysis of age-related gene expression alterations i
 
 Developed by Arthur Schneider, Rita Martins-Silva and Alexandre Kaizeler
 
-[Disease Transcriptomics lab](https://imm.medicina.ulisboa.pt/group/distrans), 2023
-
-
+[Disease Transcriptomics Lab](https://imm.medicina.ulisboa.pt/group/distrans), 2023
