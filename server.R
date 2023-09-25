@@ -42,6 +42,7 @@ shinyServer(
     #Need to take gene-specific information from DB_pvalue_ShARP-LM.db
     #p_Alterations gathers signficiance for all tissue for a single genes and vriable
     p_Alterations <- reactive({
+       
       gene <- input$gene
       variable <- input$variable_Gene_Alteration
       validate(need(!is.null(gene) & gene != "", "")) 
@@ -68,9 +69,12 @@ shinyServer(
           tmp <- readRDS(paste("data/DB_pvalue_ShARP-LM/",
                                modifiedTissuename[i], "_",
                                variable, ".RDS", sep = ""))
-          tmp <- tmp[tmp$row_names == gene,]
+          tmp <- tmp[tmp$gene == gene,]
           tmp <- tmp[, -1]
           tmp <- -log10(tmp)
+          
+    
+          
           fit <- smooth.spline(as.numeric(colnames(tmp)), tmp)
           fit <- predict(fit, seq(26, 64, by = 0.5))$y
           tmp <- data.frame(t(fit))
@@ -108,7 +112,7 @@ shinyServer(
         pvalueData <- readRDS(paste("data/DB_pvalue_ShARP-LM/",
                                     modifiedTissuename, "_", variable, ".RDS",
                                     sep = ""))
-        pvalueData <- pvalueData[pvalueData$row_names == gene,]
+        pvalueData <- pvalueData[pvalueData$gene == gene,]
         pvalueData <- pvalueData[, -1]
       }
       pvalueData
@@ -314,6 +318,7 @@ shinyServer(
 
 #Alterations
     output$Heatmap_signficanceAlterationsvsAge <- renderHighchart({
+       
       gene <- input$gene
       variable <- input$variable_Gene_Alteration
       variable <- ifelse(variable == "Age", "Age", ifelse(variable == "Gender", "Sex", "Age&Sex"))
