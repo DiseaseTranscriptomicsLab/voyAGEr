@@ -139,8 +139,8 @@ shinyServer(
         p <- readRDS(paste("data/DB_pvalue_ShARP-LM/",
                            modifiedTissuename, "_", input$variable_model_2,
                            ".RDS", sep = ""))
-
-        rownames(p) <- p$row_names
+ 
+        rownames(p) <- p$gene
         p <- p[,-1]
       }
       p
@@ -568,13 +568,14 @@ shinyServer(
 
     #Data table of the gene differential expression signgificance
     output$genePeakTable <- DT::renderDataTable({
+      
       validate(need(!is.null(input$peakClicked), "")) # A peak must be chosen
       tissue <- input$tissue_2
       variable <- input$variable_model_2
       peakClicked <- input$peakClicked
       validate(need(!is.na(match(peakClicked, colnames(p()))), "")) # Matching column between age and peak must be found (avoid error when change tissue)
       validate(need(input$peakClickedVariable == variable, "")) #When a peak is clicked and the variable is changed, enable to remove the table while no peak is selected from the new polot
-      tmp <- data.frame(gene = as.character(rownames(p())),
+      tmp <- data.frame(gene = as.character(rownames(p())), 
                         pvalue = round(p()[, match(peakClicked, colnames(p()))], 6))
       tmp <- tmp[order(tmp$pvalue),]
       rownames(tmp) <- 1:nrow(tmp)
@@ -637,7 +638,7 @@ shinyServer(
       validate(need(!is.na(selectedGene()), "Select a gene"))
       validate(need(input$peakClickedVariable == input$variable_model_2, "")) #When a peak is clicked and the variable is changed, enable to remove the plot while no peak is selected from the new polot
       tissue <- input$tissue_2
-      gene <- selectedGene()
+      gene <- selectedGene() 
       pvalueData <- p()
       coloredBy <- input$variable_model_2
       geneInfo <- geneList$info[match(gene, geneList$gene)]
