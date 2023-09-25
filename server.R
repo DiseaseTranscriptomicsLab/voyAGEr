@@ -282,10 +282,21 @@ shinyServer(
 #Profile
     output$Heatmap_LoessGEvsAge <- renderHighchart({
       gene <- input$gene
+ 
+      # Images not working
+      # title <- paste(gene, " ",
+      #                "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'> <img src='NCBI.png' title='NCBI' height='30px' style='padding-bottom:5px;'/></a>",
+      #                "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'> <img src='geneCards.png' title='GeneCards' height='30px' style='padding-bottom:5px;'/></a>",
+      #                sep = "")
+      
       title <- paste(gene, " ",
-                     "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'> <img src='NCBI.png' title='NCBI' height='30px' style='padding-bottom:5px;'/></a>",
-                     "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'> <img src='geneCards.png' title='GeneCards' height='30px' style='padding-bottom:5px;'/></a>",
+                     "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'>NCBI</a>",
+                     " | ",
+                     "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'>GeneCards</a>",
                      sep = "")
+      
+      
+      
       #The gene list is loaded faster that the tissue list. In the meantime, an error message appears since no tissue is selcted
       validate(need(input$tissue != "", "")) #avoid the error message
       g <- Heatmap_LoessGEvsAge(geneData())
@@ -306,9 +317,14 @@ shinyServer(
       gene <- input$gene
       variable <- input$variable_Gene_Alteration
       variable <- ifelse(variable == "Age", "Age", ifelse(variable == "Gender", "Sex", "Age&Sex"))
+      # title <- paste(gene, " ",
+      #                "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'> <img src='NCBI.png' title='NCBI' height='30px' style='padding-bottom:5px;'/></a>",
+      #                "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'> <img src='geneCards.png' title='GeneCards' height='30px' style='padding-bottom:5px;'/></a>",
+      #                sep = "")
       title <- paste(gene, " ",
-                     "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'> <img src='NCBI.png' title='NCBI' height='30px' style='padding-bottom:5px;'/></a>",
-                     "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'> <img src='geneCards.png' title='GeneCards' height='30px' style='padding-bottom:5px;'/></a>",
+                     "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'>NCBI</a>",
+                     " | ",
+                     "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'>GeneCards</a>",
                      sep = "")
       validate(need(input$tissue != "", "")) #avoid the error message
       g <- Heatmap_signficanceAlterationsvsAge(p_Alterations())
@@ -336,9 +352,14 @@ shinyServer(
       #when a new gene is selected, geneData is updated sooner than input$tissue generating an error message
       validate(need(nrow(geneData()[geneData()$tissue == input$tissue, ]) != 0, "")) #allow to hide the error message
       #Title woth logo linking to genecards and NCBI websites
+      # title <- paste(gene, " ",
+      #                "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'> <img src='NCBI.png' title='NCBI' height='30px' style='padding-bottom:5px;'/></a>",
+      #                "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'> <img src='geneCards.png' title='GeneCards' height='30px' style='padding-bottom:5px;'/></a>",
+      #                sep = "")
       title <- paste(gene, " ",
-                     "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'> <img src='NCBI.png' title='NCBI' height='30px' style='padding-bottom:5px;'/></a>",
-                     "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'> <img src='geneCards.png' title='GeneCards' height='30px' style='padding-bottom:5px;'/></a>",
+                     "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'>NCBI</a>",
+                     " | ",
+                     "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'>GeneCards</a>",
                      sep = "")
       g <- scatter_GEvsAge(geneData(), tissue, colored = colored, shaped = condition,
                            donorCondition = donorCondition, gene = gene, geneInfo = geneInfo)
@@ -458,9 +479,14 @@ shinyServer(
       tissue <- input$tissue
       validate(need(!is.null(tissue) & tissue != "" & tissue != "All tissues", ""))
       pvalueData <- p_Alteration_gene()
+      # title <- paste(gene, " ",
+      #                "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'> <img src='NCBI.png' title='NCBI' height='30px' style='padding-bottom:5px;'/></a>",
+      #                "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'> <img src='geneCards.png' title='GeneCards' height='30px' style='padding-bottom:5px;'/></a>",
+      #                sep = "")
       title <- paste(gene, " ",
-                     "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'> <img src='NCBI.png' title='NCBI' height='30px' style='padding-bottom:5px;'/></a>",
-                     "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'> <img src='geneCards.png' title='GeneCards' height='30px' style='padding-bottom:5px;'/></a>",
+                     "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'>NCBI</a>",
+                     " | ",
+                     "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'>GeneCards</a>",
                      sep = "")
 
       validate(need(!is.null(pvalueData), "No possible analysis for this alteration in this tissue"))
