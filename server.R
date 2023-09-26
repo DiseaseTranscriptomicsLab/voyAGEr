@@ -858,9 +858,11 @@ shinyServer(
       validate(need(!is.null(input$familyClicked), "Select a family"))
 
 
-      tmp <- rbind(data.frame(pathway = Cluster_Reactome_affiliation[[input$familyClicked]][!is.na(Cluster_Reactome_affiliation[[input$familyClicked]][,1]),1]),
-                   data.frame(pathway = Cluster_Reactome_affiliation[[input$familyClicked]][!is.na(Cluster_Reactome_affiliation[[input$familyClicked]][,2]),2]))
+      # tmp <- rbind(data.frame(pathway = Cluster_Reactome_affiliation[[input$familyClicked]][!is.na(Cluster_Reactome_affiliation[[input$familyClicked]][,1]),1]),
+      #              data.frame(pathway = Cluster_Reactome_affiliation[[input$familyClicked]][!is.na(Cluster_Reactome_affiliation[[input$familyClicked]][,2]),2]))
 
+      tmp <- as.data.frame(as.matrix(c(Cluster_Reactome_affiliation[[input$familyClicked]]$REACTOME.pathways,Cluster_Reactome_affiliation[[input$familyClicked]]$KEGG.GO.pathways),ncol=2))
+      
       filename <- paste("voyAGEr_WordCloud_family-", input$familyClicked, sep = '')
       DT::datatable(tmp,
                     escape = F,

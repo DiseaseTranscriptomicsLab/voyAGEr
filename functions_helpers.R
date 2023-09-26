@@ -729,15 +729,17 @@ Heatmap_NESAgevsPathway <- function(peak, tissue, variable, enrichment, Cluster_
 
 wordcloud_family <- function(Cluster_Reactome_affiliation, family)
 {
-  tmp <- melt(lapply(Cluster_Reactome_affiliation, function(X) c(X[,1], X[,2])))
-  tmp <- tmp[!is.na(tmp$value),]
-  colnames(tmp) <- c("pathway", "family")
   
-  tmp <- paste(as.character(tmp$pathway[tmp$family == family]), collapse = " ")
-  tmp <- gsub("REACTOME", "", tmp)
+  #browser()
+  tmp <- c(Cluster_Reactome_affiliation[[family]]$REACTOME.pathways,Cluster_Reactome_affiliation[[family]]$KEGG.GO.pathways) 
+  tmp <- tmp[!is.na(tmp)]
+  tmp <- gsub("REACTOME", "", tmp) 
   tmp <- gsub("GO", "", tmp)
   tmp <- gsub("KEGG", "", tmp)
   tmp <- gsub("_", " ", tmp)
+  # remove uninformative words
+  tmp <- gsub("PROCESS", "", tmp)
+  tmp <- gsub("REGULATION", "", tmp)
   for (i in toupper(tm::stopwords("en")))
   {
     i <- paste0(" ", i, " ")
