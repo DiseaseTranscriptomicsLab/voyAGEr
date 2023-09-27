@@ -57,7 +57,13 @@ Line_sigGenesvsAge <- function(tissue, variable, peak)
                       Shiny.onInputChange('peakClickedVariable', event.point.series.name)}")
   ClickFunction2 <- JS("function(event) {console.log(event)  }")
   
-  tmp$mycolor <- circlize::colorRamp2(breaks = c(0, 1.3, 2), colors = c("#dfe59a", "#9dca94", "#346875"))(tmp$log10p)
+  if (max(tmp$log10p)< -log10(0.05)){
+    max_scale <- -log10(0.05) 
+  } else {
+    max_scale <- max(tmp$log10p)
+  }
+  
+  tmp$mycolor <- circlize::colorRamp2(breaks = c(0, max_scale/2, max_scale), colors = c("#dfe59a", "#9dca94", "#346875"))(tmp$log10p)
   
   g <- hchart(tmp, "scatter", hcaes(x = age, y = PercSigGene, 
                                     color = mycolor), name = variable) %>%
@@ -67,7 +73,7 @@ Line_sigGenesvsAge <- function(tissue, variable, peak)
                                  marker = list(radius = 8, enabled = T, 
                                                states = list(select = list(fillColor = "tomato", lineWidth = 0, radius = 14))),
                                  events = list(click = ClickFunction))) %>%
-    hc_colorAxis(stops = list(list(0, "#dfe59a"), list(0.4, "#9dca94"), list(1.3, "#346875")),
+    hc_colorAxis(stops = list(list(0, "#dfe59a"), list(0.5, "#9dca94"), list(1, "#346875")),
                  min = 0, max = max(tmp$log10p)) %>% 
     hc_legend(layout = "horizontal", reversed = T,
               align = "center", title = list(text = "-log<sub>10</sub>(FDR)"), useHTML = TRUE) %>%
