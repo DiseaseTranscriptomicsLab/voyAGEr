@@ -396,21 +396,21 @@ shinyUI(fluidPage(
                                                                                    column(width = 12, 
                                                                                           HTML("<small>Pathways significantly associated with the module are highlighted (<font color='tomato'>p-value <= 0.05</font> in red and <font color='tomato'><b> adjusted p-value <= 0.05</b></font> in bold).
                                                                                                <br>The significance of the module’s enrichment in <a href='https://reactome.org/' target='_blank'>REACTOME</a> pathways is computed with Fisher’s exact tests.
-                                                                                               <br>P-values were Bonferroni-adjusted for multiple testing.</small>"),
+                                                                                               <br>P-values were corrected for multiple testing with Benjamini-Hochberg’s FDR.</small>"),
                                                                                           div(DT::dataTableOutput("DT_moduleEnrichment_One"), style = "font-size: 80%; width: 100%", server = F))),
-                                                                          tabPanel("Diseases-DOSE",
+                                                                          tabPanel("Diseases-DisGeNET",
                                                                                    icon = icon("briefcase-medical"),
                                                                                    column(width = 12,
                                                                                           HTML("<small>Diseases significantly associated with the module are highlighted (<font color='tomato'>p-value <= 0.05</font> in red and <font color='tomato'><b> adjusted p-value <= 0.05</b></font> in bold).
-                                                                                               <br>The significance of the module’s enrichment in <a href='https://www.disgenet.org/search' target='_blank'>DisGeNET</a> gene-disease associations is calculated with the DOSE package <a href='http://www.bioconductor.org/packages/release/bioc/html/DOSE.html' target='_blank'>(Yu et al.)</a>.
-                                                                                               <br>P-values were for multiple testing with Benjamini-Hochberg’s FDR.</small>"),
+                                                                                               <br>The significance of the module’s enrichment in <a href='https://www.disgenet.org/search' target='_blank'>DisGeNET</a> gene-disease associations (from the <code>CURATED</code> set) is calculated with the disgenet2r package <a href='https://www.disgenet.org/static/disgenet2r/disgenet2r.html' target='_blank'>(Piñero et al.)</a>.
+                                                                                               <br>P-values were corrected for multiple testing with Benjamini-Hochberg’s FDR.</small>"),
                                                                                           div(DT::dataTableOutput("DT_diseaseEnrichment"), style = "font-size: 80%; width: 100%", server = F))),
                                                                           tabPanel("Diseases-Manual",
                                                                                    icon = icon("briefcase-medical"),
                                                                                    column(width = 12,
                                                                                           HTML("<small>Diseases significantly associated with the module are highlighted (<font color='tomato'>p-value <= 0.05</font> in red and <font color='tomato'><b> adjusted p-value <= 0.05</b></font> in bold).
-                                                                                               <br>The significance of the module’s enrichment in <a href='https://www.disgenet.org/search' target='_blank'>DisGeNET</a> gene-disease associations is calculated with Fisher's exact tests. Only diseases with at least 20 associated genes were used in the analysis.
-                                                                                               <br>P-values were Bonferroni-adjusted for multiple testing.</small>"),
+                                                                                               <br>The significance of the module’s enrichment in <a href='https://www.disgenet.org/search' target='_blank'>DisGeNET</a> gene-disease associations is calculated with Fisher's exact tests. Only diseases with at least 20 associated genes and less than 500 genes were used in the analysis.
+                                                                                               <br>P-values were corrected for multiple testing with Benjamini-Hochberg’s FDR.</small>"),
                                                                                           div(DT::dataTableOutput("DT_diseaseEnrichmentManual"), style = "font-size: 80%; width: 100%", server = F)))
                                                                           )
                                                               
