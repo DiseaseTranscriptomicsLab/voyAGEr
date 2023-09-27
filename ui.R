@@ -182,7 +182,7 @@ shinyUI(fluidPage(
                                       conditionalPanel(condition = "input.EnrichmentDataset == 'User-specified' && input.tissue_tab == 'Enrichment' && input.tissue_2 != 'All tissues' && input.tissue_2 != ''",
                                                        textAreaInput("geneListEnrichment", "List of genes",
                                                                      height = "300px", placeholder = "e.g.\nPCNA\nmki67\nglb1\nCDKN2A\nCDKN1A\nDEC1\ncdkn2b\nTNFRSF10D"),
-                                                       numericInputIcon("manualEnrichmentThreshold", label = "Differential expression threshold (p-value)",
+                                                       numericInputIcon("manualEnrichmentThreshold", label = "Significance threshold (p-value)",
                                                                     value = 0.05, min = 0, max = 1),
                                                        actionButton("manualEnrichment", "Run")),
                                       conditionalPanel(condition = "input.EnrichmentDataset == 'Reactome' && input.tissue_tab == 'Enrichment'",
@@ -219,7 +219,7 @@ shinyUI(fluidPage(
                                                                              conditionalPanel(condition = "input.variable_model_2 == 'Int_Age_Gender'",
                                                                                               tags$h4("Tissue-specific differences in age-related gene expression alterations between sexes over age"),
                                                                              ),
-                                                                             HTML("Click on a dot to browse the differentially expressed genes associated with the respective age-window linear model."),
+                                                                             HTML("Click on a dot to browse the altered genes (p.value/FDR <= 0.05) associated with the respective age-window linear model."),
                                                                              highchartOutput("SigvsAge", height = "400px")
                                                                       ),
                                                                       conditionalPanel(condition = "output.selectedGene != 'none' || isNaN(output.selectedGene)",
@@ -244,8 +244,9 @@ shinyUI(fluidPage(
                                                                                               conditionalPanel(condition = "input.variable_model_2 == 'Int_Age_Gender'",
                                                                                                                tags$h4("Tissue-specific differences in age-related alterations of biological pathways between sexes over age"),
                                                                                               ),
-                                                                                              HTML("Gene Set Enrichment Analyses done on <a href='https://reactome.org/' target='_blank'>REACTOME</a> pathways.
-                                                                                  <br>Pathways are gathered into families (together with those from <a href='https://www.genome.jp/kegg/' target='_blank'>KEGG</a> and level 3 <a href='http://geneontology.org/' target='_blank'>Gene Ontology</a> Biological Processes) based on the proportion of genes in common."),
+                                                                                              HTML("Gene Set Enrichment Analyses done on <a href='https://reactome.org/' target='_blank'>REACTOME</a> pathways (excluding those with fewer than 15 genes and more than 500).
+                                                                                  <br>Pathways are gathered into families (together with those from <a href='https://www.genome.jp/kegg/' target='_blank'>KEGG</a> and level 3 <a href='http://geneontology.org/' target='_blank'>Gene Ontology</a> Biological Processes) based on the proportion of genes in common.
+                                                                                                   <br>Only pathways with FDR <=0.05 for the respective age, whose enrichment's adjusted p.value <=0.05 and that belong to the top 1% of adjusted p.values are shown."),
                                                                                               withSpinner(combineWidgetsOutput("Heatmap_NESAgevsPathway", height = "600px"),
                                                                                                           color = "#2C3E50", type = 5, size = 0.5)),
                                                                                        tags$h4("Families of pathways"),
@@ -363,7 +364,8 @@ shinyUI(fluidPage(
                                                                                                                        color = "#2C3E50", type = 5, size = 0.5)
                                                                                           ),
                                                                                           conditionalPanel(condition = "input.selectedModule == 'All modules' && input.diseaseMethod == 'Manual'",
-                                                                                                           HTML("The enrichment is based on the gene-disease association from <a href='https://www.disgenet.org/search' target='_blank'>DisGeNET</a> and calculated with Fisher tests."),
+                                                                                                           HTML("The enrichment is based on the gene-disease association from <a href='https://www.disgenet.org/search' target='_blank'>DisGeNET</a> and calculated with Fisher tests.
+                                                                                                                <br>P-values were corrected for multiple testing with Benjamini-Hochberg's FDR."),
                                                                                                            withSpinner(highchartOutput("Heatmap_moduleDiseaseEnrichmentManual_All", height = "600px"), 
                                                                                                                        color = "#2C3E50", type = 5, size = 0.5)
                                                                                           )

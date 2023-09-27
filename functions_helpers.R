@@ -78,8 +78,8 @@ Line_sigGenesvsAge <- function(tissue, variable, peak)
     hc_legend(layout = "horizontal", reversed = T,
               align = "center", title = list(text = "-log<sub>10</sub>(FDR)"), useHTML = TRUE) %>%
     hc_xAxis(title = list(text = "Age (years)"), min = 20, max = 70) %>%
-    hc_yAxis(title = list(text = "% significantly differentially expressed genes")) %>%
-    hc_tooltip(formatter = JS("function(){return '<b>Age</b>: ' + this.point.age + ' y.o., <br><b>%sig genes</b>: ' + Highcharts.numberFormat(this.point.PercSigGene, 2) + ',<br><b> -log<sub>10</sub>(FDR)</b>: ' + Highcharts.numberFormat(this.point.options.log10p, 2);}"), useHTML = TRUE) 
+    hc_yAxis(title = list(text = "% altered genes")) %>%
+    hc_tooltip(formatter = JS("function(){return '<b>Age</b>: ' + this.point.age + ' y.o., <br><b>%alt genes</b>: ' + Highcharts.numberFormat(this.point.PercSigGene, 2) + ',<br><b> -log<sub>10</sub>(FDR)</b>: ' + Highcharts.numberFormat(this.point.options.log10p, 2);}"), useHTML = TRUE) 
   
   return(g)
 }
@@ -724,10 +724,10 @@ Heatmap_NESAgevsPathway <- function(peak, tissue, variable, enrichment, Cluster_
              width = '30%', right = "70%") %>%
     hc_colorAxis(stops = color_stops(10, rev(plasma(10))),
                  reversed = F) %>%
-    hc_legend(title = list(text = "% significantly<br> differentially<br> expressed <br> genes", style = list(transform = "rotate(90deg)", fontWeight = "bold")), 
+    hc_legend(title = list(text = "% altered <br> genes", style = list(transform = "rotate(90deg)", fontWeight = "bold")), 
               align = "right", useHTML = T, floating = T,
               layout = "vertical", verticalAlign = "top", x = -10) %>%
-    hc_tooltip(pointFormat = HTML("<b>%sig genes</b>: {point.value:.2f} <br><b>Age:</b> {point.yf} y.o."), 
+    hc_tooltip(pointFormat = HTML("<b>%alt genes</b>: {point.value:.2f} <br><b>Age:</b> {point.yf} y.o."), 
                headerFormat = HTML("")) 
   
   return(manipulateWidget::combineWidgets(g, g1, ncol = 2, colsize = c(3,1)))

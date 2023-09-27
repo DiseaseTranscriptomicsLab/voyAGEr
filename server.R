@@ -590,7 +590,7 @@ shinyServer(
 
       DT::datatable(tmp,
                     escape = F,
-                    caption = "Differential expression significance",
+                    caption = "Significance for gene expression alteration",
                     selection = "single", #only one row selected at a time
                     #filter = "top", #can filter the results per column
                     options = list(deferRender = TRUE, scrollY = 600, scroller = TRUE, scollX = T,
@@ -928,11 +928,11 @@ shinyServer(
         title = "Contingency Table",
         column(width = 12,
                HTML("The table summarises the numbers of studied genes differentially expressed and not that are part of the user-defined gene set and that are not.
-                    <br> It is the basis for the Fisher’s exact test for the significance of the user-specified geneset’s enrichment in differentially expressed genes."),
+                    <br> It is the basis for the Fisher’s exact test for the significance of the user-specified geneset’s enrichment in altered genes."),
                DT::renderDataTable(contingencyManualEnrichment(),
                                    selection = list(mode = "none"),
                                    options = list(dom = "t"),
-                                   rownames = c("Differentially Expressed", "Not differentially expressed"),
+                                   rownames = c("Altered", "Not altered"),
                                    colnames = c("User's genes", "Other genes"))
         ),
         easyClose = TRUE,
