@@ -798,6 +798,9 @@ Heatmap_family <- function(Cluster_Reactome)
 
 Heatmap_FisherTest_cellComposition <- function(pvalueFisherTest)
 {
+   
+  pvalueFisherTest$value <- round(pvalueFisherTest$value,2)
+  pvalueFisherTest$oddsRatio <- round(pvalueFisherTest$oddsRatio,2)
   
   pvalueFisherTest$cellType <- gsub("\\.", " ", pvalueFisherTest$cellType)
   names(pvalueFisherTest)[3] <- "value"
@@ -815,7 +818,8 @@ Heatmap_FisherTest_cellComposition <- function(pvalueFisherTest)
     hc_tooltip(formatter = JS("function(){return '<b>Module: </b>' + this.point.module + '<br><b>Cell type: </b>' + this.point.cellType + '<br><b>-log<sub>10</sub>(p): </b>' + this.point.value;}"), useHTML = T) %>%
     hc_yAxis(labels = list(enabled = legendLabels), title = list(text = "Modules"),
              lineWidth = 0, minorGridLineWidth = 0, gridLineWidth = 0) %>%
-    hc_xAxis(title = list(text = "Cell type"), labels = list(autoRotation = F))
+    hc_xAxis(title = list(text = "Cell type"), labels = list(autoRotation = F, rotation = 60)) # Add the rotation argument here
+  
   
   return(g)
   # #Adding of heatmap to depict the modules
