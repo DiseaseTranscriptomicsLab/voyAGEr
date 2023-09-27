@@ -35,7 +35,7 @@ Heatmap_log10FDRvsAge <- function(variable, AgeWaves)
                  min = 0,
                  reversed = F) %>%
     hc_legend(layout = "vertical", verticalAlign = "top",
-              align = "right", title = list(text = "-log<sub>10</sub>(FDR) <br/>  <i><small> Proportion DE genes <i/><small/>", style = list(fontSize = '16px')), useHTML = TRUE) %>%
+              align = "right", title = list(text = "-log<sub>10</sub>(FDR) <br/>  <i><small> Proportion altered genes <i/><small/>", style = list(fontSize = '16px')), useHTML = TRUE) %>%
     hc_xAxis(title = list(text = "Age (years)", style = list(fontSize = '18px')),
              labels = list(style = list(fontSize = "14px"))) %>%
     hc_yAxis(title = list(text = "Tissue", style = list(fontSize = '18px')), reversed = TRUE) %>%
@@ -608,8 +608,8 @@ Heatmap_LoessGEvsAge <- function(data)
   #b[is.na(b)] <- -100
   b <- melt(b)
   colnames(b) <- c("tissue", "age", "expression")
-  
-  g <- hchart(b, type = "heatmap", hcaes(x = age, y = tissue, value = expression))    %>%
+   
+  g <- hchart(b, type = "heatmap", hcaes(x = age, y = tissue, value = expression)) %>%
     hc_colorAxis(stops = list(list(0.3, "dodgerblue"), list(0.5, "white"), list(0.7, "tomato")),
                  min = -2, max = 2,
                  reversed = F) %>%
@@ -617,12 +617,12 @@ Heatmap_LoessGEvsAge <- function(data)
                             {return '<b>Age</b>: ' + this.point.age + ' y.o., <br><b>Tissue</b>: ' + this.point.tissue + ',<br><b>scaled GE </b>: No data'}
   else
   {return '<b>Age</b>: ' + this.point.age + ' y.o., <br><b>Tissue</b>: ' + this.point.tissue + ',<br><b>scaled GE</b>: ' + Highcharts.numberFormat(this.point.options.expression, 2);}
-                            }")) %>% 
-    hc_legend(layout = "vertical", verticalAlign = "top", reversed = TRUE,
-              align = "right", title = list(text = "<center>Gene Expression<br> (Z-scores)</center>", style = list(fontSize = '16px')), useHTML = TRUE) %>%
+                            }")) %>%
+    hc_legend(title = list(text = "<center>Gene Expression<br>(Z-scores)</center>", style = list(fontSize = '16px')),align = "right", layout = "vertical", verticalAlign = "top",reversed = TRUE) %>%
     hc_xAxis(title = list(text = "Age (years)", style = list(fontSize = '18px')),
              labels = list(style = list(fontSize = "14px"))) %>%
     hc_yAxis(title = list(text = "Tissue", style = list(fontSize = '18px'))) 
+  
   
   
   return(g)
@@ -943,9 +943,10 @@ Heatmap_LoessMEvsAge <- function(age)
     hc_colorAxis(stops = list(list(0.3, "dodgerblue"), list(0.5, "white"), list(0.7, "tomato")),
                  reversed = F) %>%
     hc_tooltip(formatter = JS("function(){return '<b>Age</b>: ' + this.point.age + ' y.o., <br><b>Module</b>: ' + this.point.module + ',<br><b>scaled GE</b>: ' + Highcharts.numberFormat(this.point.options.expression, 2);}")) %>% 
-    hc_legend(layout = "vertical", verticalAlign = "top", reversed = F,
-              align = "right", title = list(text = "<center>Eigengene Expression<br> (Z-scores)</center>", style = list(fontSize = '16px')), useHTML = TRUE) %>%
-    hc_xAxis(title = list(text = "Age (years)", style = list(fontSize = '18px')),
+    hc_legend(title = list(text = "<center>Eigengene Expression<br>(Z-scores)</center>", style = list(fontSize = '16px')),align = "right", layout = "vertical", verticalAlign = "top",reversed = TRUE) %>%
+    
+    
+     hc_xAxis(title = list(text = "Age (years)", style = list(fontSize = '18px')),
              labels = list(style = list(fontSize = "14px")),
              lineWidth = 0) %>%
     hc_yAxis(title = list(text = "", style = list(fontSize = '18px')),
