@@ -1445,10 +1445,13 @@ Heatmap_moduleEnrichment <- function(enrich, Cluster_Reactome, module = F, tissu
 
 Heatmap_diseaseEnrichment <- function(diseaseEnrichment, disease)
 {
+  #browser()
   tmp <- diseaseEnrichment
   tmp$log10p <- -log10(tmp$padj)
   tmp <- tmp[tmp$Disease %in% disease,]
   tmp <- dcast(data = tmp, Module ~ Disease, value.var = "log10p")
+  
+  tmp[is.na(tmp)] <- 0
   
   if (length(disease) > 1)
   {

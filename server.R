@@ -1012,7 +1012,7 @@ shinyServer(
                                           title = "Select a family")),
                highchartOutput("wordcloud_family_enrichment")
         )
-      } else if (input$modules == "Diseases" & input$diseaseMethod == "DOSE")
+      } else if (input$modules == "Diseases" & input$diseaseMethod == "DisGeNET")
       {
         disease <- as.character(unique(moduleInfo$diseaseEnrichment[[input$tissue_module]]$dataframe$Description))
         column(width = 12,
@@ -1098,14 +1098,14 @@ shinyServer(
     })
 
 
-    #Disease Enrichment - DOSE
+    #Disease Enrichment - DisGeNET
     output$Heatmap_moduleDiseaseEnrichment_All <- renderHighchart({
       tissue <- input$tissue_module
       moduleDiseaseEnrichment <- moduleInfo$diseaseEnrichment[[tissue]]$matrix
       validate(need(length(input$selectedDiseases) >= 1, "Select disease(s) of interest"))
       Heatmap_diseaseEnrichment(diseaseEnrichment = moduleDiseaseEnrichment, disease = input$selectedDiseases) %>%
         hc_exporting(enabled = T,
-                     filename = paste("voyAGEr_module_", tissue, "_diseaseDOSE", sep = ''),
+                     filename = paste("voyAGEr_module_", tissue, "_diseaseDisGeNET", sep = ''),
                      buttons = list(contextButton = list(align = "right",
                                                          symbolStrokeWidth = 4,
                                                          symbolSize = 20,
@@ -1256,7 +1256,7 @@ validate(need(nrow(moduleCellType[moduleCellType$module == module,]) !=0 , ""))
       })
 
 
-    #Disease enrichment - DOSE
+    #Disease enrichment - DisGeNET
     output$DT_diseaseEnrichment <- DT::renderDataTable({
       tissue <- input$tissue_module
       moduleEnrichment <- moduleInfo$diseaseEnrichment[[tissue]]$dataframe
@@ -1267,7 +1267,7 @@ validate(need(nrow(moduleCellType[moduleCellType$module == module,]) !=0 , ""))
       moduleEnrichment$pvalue <- round(moduleEnrichment$pvalue, 5)
       moduleEnrichment$p.adjust <- round(moduleEnrichment$p.adjust, 5)
 
-      filename <- paste("voyAGEr_diseaseDOSE_", module, "_", tissue, sep = '')
+      filename <- paste("voyAGEr_diseaseDisGeNET_", module, "_", tissue, sep = '')
       DT::datatable(moduleEnrichment[, c("Description", "pvalue", "p.adjust")],
                     escape = F,
                     selection = list(mode = "none"),

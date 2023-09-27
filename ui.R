@@ -310,7 +310,7 @@ shinyUI(fluidPage(
                                                                   textOutput("geneInModules")),
                                                  conditionalPanel(condition = "input.selectedModule == 'All modules' && input.modules == 'Diseases'",
                                                                   awesomeRadio(inputId = "diseaseMethod", label = "Method", inline = TRUE, checkbox = TRUE, 
-                                                                               choices = c("DOSE", "Manual"))
+                                                                               choices = c("DisGeNET", "Manual"))
                                                  ),
                                                  conditionalPanel(condition = "input.selectedModule != 'All modules' && input.selectedModule != ''",
                                                                   awesomeRadio(inputId = "moduleColoredBy", label = "Colored By", 
@@ -356,8 +356,8 @@ shinyUI(fluidPage(
                                                                                    icon = icon("briefcase-medical"),
                                                                                    column(width = 12, 
                                                                                           tags$h4("Disease enrichment"),
-                                                                                          conditionalPanel(condition = "input.selectedModule == 'All modules' && input.diseaseMethod == 'DOSE'",
-                                                                                                           HTML("The significance of each module’s enrichment in <a href='https://www.disgenet.org/search' target='_blank'>DisGeNET</a> gene-disease associations is calculated with the DOSE package <a href='http://www.bioconductor.org/packages/release/bioc/html/DOSE.html' target='_blank'>(Yu et al.)</a>.
+                                                                                          conditionalPanel(condition = "input.selectedModule == 'All modules' && input.diseaseMethod == 'DisGeNET'",
+                                                                                                           HTML("The significance of the module’s enrichment in <a href='https://www.disgenet.org/search' target='_blank'>DisGeNET</a> gene-disease associations (from the <code>CURATED</code> set) is calculated with the disgenet2r package <a href='https://www.disgenet.org/static/disgenet2r/disgenet2r.html' target='_blank'>(Piñero et al.)</a>.
                                                                                                <br>P-values were corrected for multiple testing with Benjamini-Hochberg’s FDR."),
                                                                                                            withSpinner(highchartOutput("Heatmap_moduleDiseaseEnrichment_All", height = "600px"), 
                                                                                                                        color = "#2C3E50", type = 5, size = 0.5)
