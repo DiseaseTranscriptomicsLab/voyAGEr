@@ -69,6 +69,9 @@ shinyServer(
           tmp <- readRDS(paste("data/DB_pvalue_ShARP-LM/",
                                modifiedTissuename[i], "_",
                                variable, ".RDS", sep = ""))
+          #gene <- gsub("-", "_", gene) # '-' creates issues when calling database so '-' were replaced by "_" in the database's names
+          #gene <- gsub("\\.", "_", gene) # '.' creates issues when calling database so '-' were replaced by "_" in the database's names
+          
           tmp <- tmp[tmp$gene == gene,]
           tmp <- tmp[, -1]
           tmp <- -log10(tmp)
@@ -166,7 +169,7 @@ shinyServer(
     geneData <- reactive({
       gene <- as.character(input$gene)
       gene <- gsub("-", "_", gene) # '-' creates issues when calling database so '-' were replaced by "_" in the database's names
-      gene <- gsub("\\.", "_", gene) # '.' creates issues when calling database so '-' were replaced by "_" in the database's names
+      #gene <- gsub("\\.", "_", gene) # '.' creates issues when calling database so '-' were replaced by "_" in the database's names
 
       # #SQL databases
       # a <- dbGetQuery(DBconnection, paste("SELECT * FROM", gene, sep = " "))
@@ -385,8 +388,8 @@ shinyServer(
 #Data table gene expression and donor information
     output$geneExpression <- DT::renderDataTable({
       gene <- as.character(input$gene)
-      gene <- gsub("-", "_", gene) # '-' creates issues when calling database so '-' were replaced by "_" in the database's names
-      gene <- gsub("\\.", "_", gene) # '.' creates issues when calling database so '-' were replaced by "_" in the database's names
+      #gene <- gsub("-", "_", gene) # '-' creates issues when calling database so '-' were replaced by "_" in the database's names
+      #gene <- gsub("\\.", "_", gene) # '.' creates issues when calling database so '-' were replaced by "_" in the database's names
       tissue <- as.character(input$tissue)
       ymin <- ifelse(input$Selectedymin == "reset", input$Selectedymin, as.numeric(input$Selectedymin))
       ymax <- ifelse(input$Selectedymax == "reset", input$Selectedymax, as.numeric(input$Selectedymax))
@@ -538,6 +541,7 @@ shinyServer(
       # #RDS files
       # gene <- readRDS(paste("/genedata/home/arthur/Documents/GTEx/shiftingLM_genes/shiny_app/RDS files/DB_GeneExpressionV2/",
       #                       "PGD", ".RDS", sep = ""))
+
       #RDS files online
       gene <- readRDS(paste("data/DB_GeneExpressionV2/",
                             "PGD", ".RDS", sep = ""))
@@ -579,7 +583,7 @@ shinyServer(
                         pvalue = round(p()[, match(peakClicked, colnames(p()))], 6))
       tmp <- tmp[order(tmp$pvalue),]
       rownames(tmp) <- 1:nrow(tmp)
-
+ 
       tmp$Info <- paste(paste0("<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", tmp$gene,"' target='_blank'>", "GeneCards", "</a>"),
                              paste0("<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", tmp$gene,"' target='_blank'>", "NCBI", "</a>"), sep = ", ")
       filename <- paste("DEG_across_", variable, "_", tissue, "_", peakClicked, "yo", sep = "")
@@ -618,9 +622,8 @@ shinyServer(
     #Import of the gene information for the chosen gene in Tissue tab
     geneData_Tissue <- reactive({
       gene <- selectedGene()
-      gene <- gsub("-", "_", gene) # '-' creates issues when calling database so '-' were replaced by "_" in the database's names
-      gene <- gsub("\\.", "_", gene) # '.' creates issues when calling database so '.' were replaced by "_" in the database's names
-      # #SQL database
+      gene <- gsub("-", "_", gene) # to match way the data was stored
+        # #SQL database
       # a <- dbGetQuery(DBconnection, paste("SELECT * FROM", gene, sep = " "))
       #RDS files local
       # a <- readRDS(paste("/genedata/home/arthur/Documents/GTEx/shiftingLM_genes/shiny_app/RDS files/DB_GeneExpressionV2/",
@@ -1374,6 +1377,7 @@ validate(need(nrow(moduleCellType[moduleCellType$module == module,]) !=0 , ""))
     output$moduleGeneList <- DT::renderDataTable({
       tmp <- moduleInfo$moduleGeneList[[input$tissue_module]]
       tmp <- data.frame(gene = as.character(tmp[[input$selectedModule]]))
+ 
       if (nrow(tmp)!=0) #to avoid error message when change of tissue
       {
         tmp$Info <- paste(paste0("<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", tmp$gene,"' target='_blank'>", "GeneCards", "</a>"),
