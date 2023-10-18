@@ -608,7 +608,7 @@ Heatmap_LoessGEvsAge <- function(data)
   #b[is.na(b)] <- -100
   b <- melt(b)
   colnames(b) <- c("tissue", "age", "expression")
-   
+ 
   g <- hchart(b, type = "heatmap", hcaes(x = age, y = tissue, value = expression)) %>%
     hc_colorAxis(stops = list(list(0.3, "dodgerblue"), list(0.5, "white"), list(0.7, "tomato")),
                  min = -2, max = 2,
@@ -813,18 +813,27 @@ Heatmap_FisherTest_cellComposition <- function(pvalueFisherTest)
   #Labls authrisation: when too many modules, difficult read yaxis laebls
   legendLabels <- ifelse(length(unique(pvalueFisherTest$module)) <= 20, TRUE, FALSE)
   
+  pvalueFisherTest$tooltip_info <- with(pvalueFisherTest, 
+                                        paste("<b>Module:</b> ", module,
+                                              "<br><b>Cell type:</b> ", cellType,
+                                              "<br><b>Odds Ratio:</b> ", oddsRatio,
+                                              "<br><b>-log<sub>10</sub>(p-value):</b> ", value))
+  
+  
+  
   g <- hchart(pvalueFisherTest, type = "heatmap",
-              hcaes(x = cellType, y = module, value = value)) %>%
+              hcaes(x = cellType, y = module, value = oddsRatio)) %>%
     hc_plotOptions(series = list(dataLabels = list(enabled = T, 
-                                                   formatter = JS("function(){if(this.point.value >= 1.3){return this.point.value;}}")))) %>%
+                                                   formatter = JS("function(){if(this.point.value > 1 && this.point.value > 1.3){return this.point.value;}}")))) %>%
     hc_legend(verticalAlign = "top", align = "left", layout = "vertical",
-              title = list(text = "-log<sub>10</sub>(p)"), useHTML = TRUE) %>%
+              title = list(text = "Odds Ratio"), useHTML = TRUE) %>%
     hc_colorAxis(stops = color_stops(9, RColorBrewer::brewer.pal(9, "Greens")),
-                 min = 0, max = plyr::round_any(max(pvalueFisherTest$value), 5, f = ceiling)) %>%
-    hc_tooltip(formatter = JS("function(){return '<b>Module: </b>' + this.point.module + '<br><b>Cell type: </b>' + this.point.cellType + '<br><b>-log<sub>10</sub>(p): </b>' + this.point.value;}"), useHTML = T) %>%
+                 min = 0, max = plyr::round_any(max(pvalueFisherTest$oddsRatio), 5, f = ceiling)) %>%
+    hc_tooltip(pointFormat = "{point.tooltip_info}", useHTML = T) %>%
     hc_yAxis(labels = list(enabled = legendLabels), title = list(text = "Modules"),
              lineWidth = 0, minorGridLineWidth = 0, gridLineWidth = 0) %>%
     hc_xAxis(title = list(text = "Cell type"), labels = list(autoRotation = F, rotation = 60)) # Add the rotation argument here
+  
   
   
   return(g)
