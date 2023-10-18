@@ -820,11 +820,17 @@ Heatmap_FisherTest_cellComposition <- function(pvalueFisherTest)
                                               "<br><b>-log<sub>10</sub>(p-value):</b> ", value))
   
   
+  # First, we ensure that the `value` column represents -log10(p-value)
+  # If it doesn't, you'll need to correct this.
   
+  # Create a new column for labeling based on the conditions you mentioned
+  pvalueFisherTest$label_value <- ifelse(pvalueFisherTest$oddsRatio > 1 & pvalueFisherTest$value > 1.3, pvalueFisherTest$oddsRatio, NA)
+  
+  # Now, you simply check for the existence of this value in the labeling function
   g <- hchart(pvalueFisherTest, type = "heatmap",
               hcaes(x = cellType, y = module, value = oddsRatio)) %>%
     hc_plotOptions(series = list(dataLabels = list(enabled = T, 
-                                                   formatter = JS("function(){if(this.point.value > 1 && this.point.value > 1.3){return this.point.value;}}")))) %>%
+                                                   formatter = JS("function(){if(!isNaN(this.point.label_value)){return this.point.label_value;}}")))) %>%
     hc_legend(verticalAlign = "top", align = "left", layout = "vertical",
               title = list(text = "Odds Ratio"), useHTML = TRUE) %>%
     hc_colorAxis(stops = color_stops(9, RColorBrewer::brewer.pal(9, "Greens")),
@@ -833,6 +839,7 @@ Heatmap_FisherTest_cellComposition <- function(pvalueFisherTest)
     hc_yAxis(labels = list(enabled = legendLabels), title = list(text = "Modules"),
              lineWidth = 0, minorGridLineWidth = 0, gridLineWidth = 0) %>%
     hc_xAxis(title = list(text = "Cell type"), labels = list(autoRotation = F, rotation = 60)) # Add the rotation argument here
+  
   
   
   
@@ -936,7 +943,8 @@ Heatmap_LoessMEvsAge <- function(age)
   {
     fit <- loess(value~age, data = age[age$module == i,])
     a <- rbind(a, 
-               data.frame(expression = scale(predict(fit, seq(20, 70, 0.5)), scale = F),
+               #data.frame(expression = scale(predict(fit, seq(20, 70, 0.5)), scale = F),
+               data.frame(expression = scale(predict(fit, seq(20, 70, 0.5)), scale = ),
                           age = seq(20, 70, 0.5),
                           module = i))
   }

@@ -339,7 +339,8 @@ shinyUI(fluidPage(
                                                                                    icon = icon("vial"),
                                                                                    column(width = 12, 
                                                                                           tags$h4("Cell type enrichment"),
-                                                                                          HTML("The significance of each module’s enrichment in each cell type markers is computed with Fisher’s exact tests."),
+                                                                                          HTML("The significance of each module’s enrichment in each cell type markers is computed with Fisher’s exact tests.
+                                                                                               <br> The labelled values have odds ratio > 1 and p-value < 0.05. "),
                                                                                           withSpinner(highchartOutput("Heatmap_FisherTest_cellComposition_All", height = "600px"), 
                                                                                                       color = "#2C3E50", type = 5, size = 0.5))
                                                                           ),
