@@ -178,7 +178,7 @@ shinyServer(
       p
     })
 
-    peak <- readRDS("data/peaks_plot_2.RDS") #to knwo the FDR for each peak for FDRvsAge
+    peak <- readRDS("data/peaks_plot_2.RDS") #to know the FDR for each peak for FDRvsAge
     AgeWavesList <- readRDS("data/FDR_Interpolation_Tissue.RDS")
     geneList <- readRDS("data/DT_NbTissuePerGene.RDS")
     donorCondition <- readRDS("data/donorCondition.RDS")
