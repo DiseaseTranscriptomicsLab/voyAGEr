@@ -157,7 +157,9 @@ shinyServer(
     technicalCondition <- readRDS("data/technicalCondition.RDS")
     Cluster_Reactome <- readRDS("data/Cluster_Reactome.RDS")
     Cluster_Reactome_affiliation <- readRDS("data/Reactome_cluster_Affiliation.RDS")
-    moduleInfo <- readRDS("data/moduleInfo_Corrected_Atlas.RDS")
+    moduleInfo <- readRDS("data/moduleInfo_Corrected_Atlas_v4.RDS") 
+    
+    
     # color2 <- c("#8DD3C7", "#FFFFB3", "#FB8072", "#80B1D3", "#FDB462", "#B3DE69", "#FCCDE5", "#D9D9D9", "#BC80BD", "#CCEBC5", "#FFED6F",
     #             "#7FC97F", "#BEAED4", "#FDC086", "#E6AB02", "#386CB0", "#A6761D", "#F0027F", "#BF5B17", "#666666", "#1B9E77", "#D95F02",
     #             "#7570B3", "#E7298A", "#66A61E", "#FFFF99", "#BEBADA")
