@@ -88,8 +88,10 @@ Line_pvaluevsAge <- function(gene, pvalueData, geneData, tissue, coloredBy)
 {
   #GE info
   GE <- geneData
-  GE <- GE[GE$tissue == tissue,]
+  GE <- GE[GE$tissue == tissue,] 
+  GE$jittered_age <- jitter_ages(GE$age)
   
+   
   if (coloredBy == "Age")
   {
     
@@ -110,7 +112,7 @@ Line_pvaluevsAge <- function(gene, pvalueData, geneData, tissue, coloredBy)
              lineColor = "yellowgreen", lineWidth = 2,
              labels = list(style = list(color = "yellowgreen")))
       ) %>% 
-      hc_add_series(data = list_parse2(GE[, c("age", "expression")]), type = "scatter", showInLegend = FALSE,
+      hc_add_series(data = list_parse2(GE[, c("jittered_age", "expression")]), type = "scatter", showInLegend = FALSE,
                     yAxis = 1, color = "yellowgreen", marker = list(radius = 4, symbol = "round")) %>% 
       # hc_add_series(data = list_parse2(data.frame(fit$age, fit$.fitted - 2*fit$.se.fit, fit$.fitted + 2*fit$.se.fit)), yAxis = 1,
       #               type = "arearange", showInLegend = FALSE, color = "lightgrey") %>%
@@ -148,9 +150,9 @@ Line_pvaluevsAge <- function(gene, pvalueData, geneData, tissue, coloredBy)
              lineColor = "grey", lineWidth = 2,
              labels = list(style = list(color = "grey")))
       ) %>% 
-      hc_add_series(data = list_parse2(GE[GE$sex == 1, c("age", "expression")]), type = "scatter", name = "Male",
+      hc_add_series(data = list_parse2(GE[GE$sex == 1, c("jittered_age", "expression")]), type = "scatter", name = "Male",
                     yAxis = 1, color = "cornflowerblue", marker = list(radius = 4, symbol = "round")) %>% 
-      hc_add_series(data = list_parse2(GE[GE$sex == 2, c("age", "expression")]), type = "scatter", name = "Female",
+      hc_add_series(data = list_parse2(GE[GE$sex == 2, c("jittered_age", "expression")]), type = "scatter", name = "Female",
                     yAxis = 1, color = "hotpink", marker = list(radius = 4, symbol = "round")) %>% 
       hc_add_series(data = list_parse2(data.frame(fit_male$age, fit_male$.fitted)), yAxis = 1, lineWidth = 5,
                     type = "line", showInLegend = FALSE, color = "cornflowerblue") %>% 
@@ -169,11 +171,35 @@ Line_pvaluevsAge <- function(gene, pvalueData, geneData, tissue, coloredBy)
   return(g)
 }
 
+jitter_ages <- function(agevec){
+  
+  set.seed(123456)
+  
+  # Create age bins, compatible to those used in the public metadata
+  bins <- cut(agevec, breaks = seq(20, 70, 5), include.lowest = TRUE)
+  
+  # Compute bin midpoints (mean of each bin)
+  bin_midpoints <- as.numeric(tapply(agevec, bins, function(x) mean(range(x))))
+  
+  # Replace values with bin midpoints
+  new_values <- bin_midpoints[(bins)]
+  
+  # Add jitter within 5-year window
+  jittered_values <- jitter(new_values, amount = 2.5) # half the bin width 
+  # Ensure values stay within 20 and 70
+  jittered_values[jittered_values < 20] <- 20
+  jittered_values[jittered_values > 70] <- 70
+  
+  return(jittered_values)
+  
+}
+
 scatter_GEvsAge <- function(data, tissue, colored, shaped, donorCondition, gene, geneInfo)
 {
   #tmp <- dbGetQuery(DBconnection, paste("SELECT * FROM", gene, sep = " "))
   tmp <- data
   tmp <- tmp[tmp$tissue == tissue,]
+  tmp$jittered_age <- jitter_ages(tmp$age) 
   
   #To zoom the plot onto a selected area
   #Removed so age can't be found to respect GTEx rules
@@ -218,7 +244,7 @@ scatter_GEvsAge <- function(data, tissue, colored, shaped, donorCondition, gene,
                , zoomType = 'xy'
                , events = list(selection = SelectFunction)
       ) %>%
-      hc_add_series(data = list_parse2(tmp[, c("age", "expression")]), showInLegend = FALSE) %>%
+      hc_add_series(data = list_parse2(tmp[, c("jittered_age", "expression")]), showInLegend = FALSE) %>%
       # hc_add_series(data = list_parse2(data.frame(fit$age, fit$.fitted - 2*fit$.se.fit, fit$.fitted + 2*fit$.se.fit)), 
       #               type = "arearange", showInLegend = FALSE) %>%
       hc_add_series(data = list_parse2(data.frame(fit$age, fit$.fitted)), 
@@ -249,13 +275,13 @@ scatter_GEvsAge <- function(data, tissue, colored, shaped, donorCondition, gene,
     if (nrow(tmp[tmp$sex == 1,])!=0)
     {
       g <- g%>%
-        hc_add_series(data = list_parse2(tmp[tmp$sex == 1, c("age", "expression")]), 
+        hc_add_series(data = list_parse2(tmp[tmp$sex == 1, c("jittered_age", "expression")]), 
                       showInLegend = TRUE, color = "cornflowerblue", name = "Male") 
     }
     if (nrow(tmp[tmp$sex == 2,])!=0)
     {
       g <- g%>%
-        hc_add_series(data = list_parse2(tmp[tmp$sex == 2, c("age", "expression")]), 
+        hc_add_series(data = list_parse2(tmp[tmp$sex == 2, c("jittered_age", "expression")]), 
                       showInLegend = TRUE, color = "hotpink", name = "Female")
     }
     if (nrow(tmp[tmp$sex == 1,])!=0)
@@ -288,7 +314,7 @@ scatter_GEvsAge <- function(data, tissue, colored, shaped, donorCondition, gene,
       
       g <- highchart() %>%
         hc_chart(type = 'scatter') %>%
-        hc_add_series(data = list_parse2(tmp[!(tmp$condition %in% c(0, 1)), c("age", "expression")]), showInLegend = TRUE,
+        hc_add_series(data = list_parse2(tmp[!(tmp$condition %in% c(0, 1)), c("jittered_age", "expression")]), showInLegend = TRUE,
                       marker = list(radius = 5, symbol = "circle"), color = "grey", name = "Unknown") %>%
         # hc_add_series(data = list_parse2(data.frame(fit$age, fit$.fitted - 2*fit$.se.fit, fit$.fitted + 2*fit$.se.fit)),
         #               type = "arearange", showInLegend = FALSE,
@@ -318,11 +344,11 @@ scatter_GEvsAge <- function(data, tissue, colored, shaped, donorCondition, gene,
                  , zoomType = 'xy'
                  , events = list(selection = SelectFunction)
         ) %>%
-        hc_add_series(data = list_parse2(tmp[tmp$condition == 1, c("age", "expression")]), showInLegend = TRUE,
+        hc_add_series(data = list_parse2(tmp[tmp$condition == 1, c("jittered_age", "expression")]), showInLegend = TRUE,
                       marker = list(radius = 7, symbol = "triangle"), color = "rgb(60,179,113)", name = "Positive") %>%
-        hc_add_series(data = list_parse2(tmp[tmp$condition == 0, c("age", "expression")]), showInLegend = TRUE,
+        hc_add_series(data = list_parse2(tmp[tmp$condition == 0, c("jittered_age", "expression")]), showInLegend = TRUE,
                       marker = list(radius = 7, symbol = "cross"), color = "rgb(255,99,71)", name = "Negative") %>%
-        hc_add_series(data = list_parse2(tmp[!(tmp$condition %in% c(0, 1)), c("age", "expression")]), showInLegend = TRUE,
+        hc_add_series(data = list_parse2(tmp[!(tmp$condition %in% c(0, 1)), c("jittered_age", "expression")]), showInLegend = TRUE,
                       marker = list(radius = 5, symbol = "circle"), color = "grey", name = "Unknown") %>%
         hc_add_series(data = list_parse2(data.frame(fit_positive$age, fit_positive$.fitted)), 
                       type = "line", showInLegend = FALSE,
@@ -353,11 +379,11 @@ scatter_GEvsAge <- function(data, tissue, colored, shaped, donorCondition, gene,
         hc_chart(type = 'scatter'
                  , zoomType = 'xy', events = list(selection = SelectFunction)
         ) %>%
-        hc_add_series(data = list_parse2(tmp[tmp$condition == 1, c("age", "expression")]), showInLegend = TRUE,
+        hc_add_series(data = list_parse2(tmp[tmp$condition == 1, c("jittered_age", "expression")]), showInLegend = TRUE,
                       marker = list(radius = 7, symbol = "triangle"), color = "rgb(60,179,113)", name = "Positive") %>%
-        hc_add_series(data = list_parse2(tmp[tmp$condition == 0, c("age", "expression")]), showInLegend = TRUE,
+        hc_add_series(data = list_parse2(tmp[tmp$condition == 0, c("jittered_age", "expression")]), showInLegend = TRUE,
                       marker = list(radius = 7, symbol = "cross"), color = "rgb(255,99,71)", name = "Negative") %>%
-        hc_add_series(data = list_parse2(tmp[!(tmp$condition %in% c(0, 1)), c("age", "expression")]), showInLegend = TRUE,
+        hc_add_series(data = list_parse2(tmp[!(tmp$condition %in% c(0, 1)), c("jittered_age", "expression")]), showInLegend = TRUE,
                       marker = list(radius = 5, symbol = "circle"), color = "grey", name = "Unknown") %>%
         # hc_add_series(data = list_parse2(data.frame(fit$age, fit$.fitted - 2*fit$.se.fit, fit$.fitted + 2*fit$.se.fit)), 
         #               type = "arearange", showInLegend = FALSE,
@@ -394,13 +420,13 @@ scatter_GEvsAge <- function(data, tissue, colored, shaped, donorCondition, gene,
     { 
       g <- g %>%  
         
-        hc_add_series(data = list_parse2(tmp[tmp$sex == 1 & tmp$condition == 1, c("age", "expression")]), 
+        hc_add_series(data = list_parse2(tmp[tmp$sex == 1 & tmp$condition == 1, c("jittered_age", "expression")]), 
                       showInLegend = FALSE, color = "cornflowerblue", name = "Male - Pos",
                       marker = list(radius = 7, symbol = "triangle")) %>%
-        hc_add_series(data = list_parse2(tmp[tmp$sex == 1 & tmp$condition == 0, c("age", "expression")]), 
+        hc_add_series(data = list_parse2(tmp[tmp$sex == 1 & tmp$condition == 0, c("jittered_age", "expression")]), 
                       showInLegend = FALSE, color = "cornflowerblue", name = "Male - Neg",
                       marker = list(radius = 7, symbol = "cross")) %>%
-        hc_add_series(data = list_parse2(tmp[tmp$sex == 1 & !(tmp$condition %in% c(0, 1)), c("age", "expression")]), 
+        hc_add_series(data = list_parse2(tmp[tmp$sex == 1 & !(tmp$condition %in% c(0, 1)), c("jittered_age", "expression")]), 
                       showInLegend = FALSE, color = "cornflowerblue", name = "Male - Unknown",
                       marker = list(radius = 5, symbol = "circle")) 
     }
@@ -408,13 +434,13 @@ scatter_GEvsAge <- function(data, tissue, colored, shaped, donorCondition, gene,
     { 
       g <- g %>%
         #Female and conditions
-        hc_add_series(data = list_parse2(tmp[tmp$sex == 2 & tmp$condition == 1, c("age", "expression")]), 
+        hc_add_series(data = list_parse2(tmp[tmp$sex == 2 & tmp$condition == 1, c("jittered_age", "expression")]), 
                       showInLegend = FALSE, color = "hotpink", name = "Female - Pos",
                       marker = list(radius = 7, symbol = "triangle")) %>%
-        hc_add_series(data = list_parse2(tmp[tmp$sex == 2 & tmp$condition == 0, c("age", "expression")]), 
+        hc_add_series(data = list_parse2(tmp[tmp$sex == 2 & tmp$condition == 0, c("jittered_age", "expression")]), 
                       showInLegend = FALSE, color = "hotpink", name = "Female - Neg",
                       marker = list(radius = 7, symbol = "cross")) %>%
-        hc_add_series(data = list_parse2(tmp[tmp$sex == 2 & !(tmp$condition %in% c(0, 1)), c("age", "expression")]), 
+        hc_add_series(data = list_parse2(tmp[tmp$sex == 2 & !(tmp$condition %in% c(0, 1)), c("jittered_age", "expression")]), 
                       showInLegend = FALSE, color = "hotpink", name = "Female - Unknown",
                       marker = list(radius = 5, symbol = "circle")) 
     }
@@ -1009,7 +1035,9 @@ Heatmap_LoessMEvsAge <- function(age)
 
 Scatter_MEvsAge <- function(MEexpressionData, module, colored, shaped, donorCondition, technicalCondition)
 {
+  #browser()
   tmp <- MEexpressionData[MEexpressionData$module == module,]
+  tmp$jittered_age <- jitter_ages(tmp$age)
   
   ClickFunction2 <- JS("function(event) {console.log(event)  }")
   
@@ -1025,7 +1053,7 @@ Scatter_MEvsAge <- function(MEexpressionData, module, colored, shaped, donorCond
     
     g <- highchart() %>%
       hc_chart(type = 'scatter') %>%
-      hc_add_series(data = list_parse2(tmp[, c("age", "value")]), showInLegend = FALSE) %>%
+      hc_add_series(data = list_parse2(tmp[, c("jittered_age", "value")]), showInLegend = FALSE) %>%
       # hc_add_series(data = list_parse2(data.frame(fit$age, fit$.fitted - 2*fit$.se.fit, fit$.fitted + 2*fit$.se.fit)), 
       #               type = "arearange", showInLegend = FALSE) %>%
       hc_add_series(data = list_parse2(data.frame(fit$age, fit$.fitted)), 
@@ -1053,13 +1081,13 @@ Scatter_MEvsAge <- function(MEexpressionData, module, colored, shaped, donorCond
     if (nrow(tmp[tmp$sex == 1,])!=0)
     {
       g <- g %>%
-        hc_add_series(data = list_parse2(tmp[tmp$sex == 1, c("age", "value")]), 
+        hc_add_series(data = list_parse2(tmp[tmp$sex == 1, c("jittered_age", "value")]), 
                       showInLegend = TRUE, color = "cornflowerblue", name = "Male") 
     }
     if (nrow(tmp[tmp$sex == 2,])!=0)
     { 
       g <- g %>%
-        hc_add_series(data = list_parse2(tmp[tmp$sex == 2, c("age", "value")]), 
+        hc_add_series(data = list_parse2(tmp[tmp$sex == 2, c("jittered_age", "value")]), 
                       showInLegend = TRUE, color = "hotpink", name = "Female")
     }
     if (nrow(tmp[tmp$sex == 1,])!=0)
@@ -1093,7 +1121,7 @@ Scatter_MEvsAge <- function(MEexpressionData, module, colored, shaped, donorCond
       for (i in 1:length(unique(tmp$coloredBy)[!is.na(unique(tmp$coloredBy))]))
       {
         g <- g %>%
-          hc_add_series(data = list_parse2(tmp[tmp$coloredBy == unique(tmp$coloredBy)[i], c("age", "value")]),
+          hc_add_series(data = list_parse2(tmp[tmp$coloredBy == unique(tmp$coloredBy)[i], c("jittered_age", "value")]),
                         showInLegend = TRUE,
                         marker = list(radius = 5, symbol = mysymbol[i]), 
                         color = mycolor[i], name = unique(tmp$coloredBy)[i])
@@ -1115,6 +1143,7 @@ Scatter_MEvsAge <- function(MEexpressionData, module, colored, shaped, donorCond
       
       fit <- loess(value ~ age, data = tmp)
       fit <- plyr::arrange(generics::augment(fit), age)
+      tmp$age <- tmp$jittered_age
       
       g <- hchart(tmp, hcaes(x = age, y = value, color = colorCondition), type = "scatter") %>%
         hc_colorAxis(stops = color_stops(9, colors = RColorBrewer::brewer.pal(9, "Reds")),
@@ -1142,7 +1171,7 @@ Scatter_MEvsAge <- function(MEexpressionData, module, colored, shaped, donorCond
       
       g <- highchart() %>%
         hc_chart(type = 'scatter') %>%
-        hc_add_series(data = list_parse2(tmp[!(tmp$condition %in% c(0, 1)), c("age", "value")]), showInLegend = TRUE,
+        hc_add_series(data = list_parse2(tmp[!(tmp$condition %in% c(0, 1)), c("jittered_age", "value")]), showInLegend = TRUE,
                       marker = list(radius = 5, symbol = "circle"), color = "grey", name = "Unknown") %>%
         # hc_add_series(data = list_parse2(data.frame(fit$age, fit$.fitted - 2*fit$.se.fit, fit$.fitted + 2*fit$.se.fit)),
         #               type = "arearange", showInLegend = FALSE,
@@ -1164,11 +1193,11 @@ Scatter_MEvsAge <- function(MEexpressionData, module, colored, shaped, donorCond
       
       g <- highchart() %>%
         hc_chart(type = 'scatter') %>%
-        hc_add_series(data = list_parse2(tmp[tmp$condition == 1, c("age", "value")]), showInLegend = TRUE,
+        hc_add_series(data = list_parse2(tmp[tmp$condition == 1, c("jittered_age", "value")]), showInLegend = TRUE,
                       marker = list(radius = 7, symbol = "triangle"), color = "rgb(60,179,113)", name = "Positive") %>%
-        hc_add_series(data = list_parse2(tmp[tmp$condition == 0, c("age", "value")]), showInLegend = TRUE,
+        hc_add_series(data = list_parse2(tmp[tmp$condition == 0, c("jittered_age", "value")]), showInLegend = TRUE,
                       marker = list(radius = 7, symbol = "cross"), color = "rgb(255,99,71)", name = "Negative") %>%
-        hc_add_series(data = list_parse2(tmp[!(tmp$condition %in% c(0, 1)), c("age", "value")]), showInLegend = TRUE,
+        hc_add_series(data = list_parse2(tmp[!(tmp$condition %in% c(0, 1)), c("jittered_age", "value")]), showInLegend = TRUE,
                       marker = list(radius = 5, symbol = "circle"), color = "grey", name = "Unknown") %>%
         hc_add_series(data = list_parse2(data.frame(fit_positive$age, fit_positive$.fitted)), 
                       type = "line", showInLegend = FALSE,
@@ -1189,11 +1218,11 @@ Scatter_MEvsAge <- function(MEexpressionData, module, colored, shaped, donorCond
       
       g <- highchart() %>%
         hc_chart(type = 'scatter') %>%
-        hc_add_series(data = list_parse2(tmp[tmp$condition == 1, c("age", "value")]), showInLegend = TRUE,
+        hc_add_series(data = list_parse2(tmp[tmp$condition == 1, c("jittered_age", "value")]), showInLegend = TRUE,
                       marker = list(radius = 7, symbol = "triangle"), color = "rgb(60,179,113)", name = "Positive") %>%
-        hc_add_series(data = list_parse2(tmp[tmp$condition == 0, c("age", "value")]), showInLegend = TRUE,
+        hc_add_series(data = list_parse2(tmp[tmp$condition == 0, c("jittered_age", "value")]), showInLegend = TRUE,
                       marker = list(radius = 7, symbol = "cross"), color = "rgb(255,99,71)", name = "Negative") %>%
-        hc_add_series(data = list_parse2(tmp[!(tmp$condition %in% c(0, 1)), c("age", "value")]), showInLegend = TRUE,
+        hc_add_series(data = list_parse2(tmp[!(tmp$condition %in% c(0, 1)), c("jittered_age", "value")]), showInLegend = TRUE,
                       marker = list(radius = 5, symbol = "circle"), color = "grey", name = "Unknown") %>%
         # hc_add_series(data = list_parse2(data.frame(fit$age, fit$.fitted - 2*fit$.se.fit, fit$.fitted + 2*fit$.se.fit)), 
         #               type = "arearange", showInLegend = FALSE,
@@ -1228,13 +1257,13 @@ Scatter_MEvsAge <- function(MEexpressionData, module, colored, shaped, donorCond
     { 
       g <- g %>%  
         
-        hc_add_series(data = list_parse2(tmp[tmp$sex == 1 & tmp$condition == 1, c("age", "value")]), 
+        hc_add_series(data = list_parse2(tmp[tmp$sex == 1 & tmp$condition == 1, c("jittered_age", "value")]), 
                       showInLegend = FALSE, color = "cornflowerblue", name = "Male - Pos",
                       marker = list(radius = 7, symbol = "triangle")) %>%
-        hc_add_series(data = list_parse2(tmp[tmp$sex == 1 & tmp$condition == 0, c("age", "value")]), 
+        hc_add_series(data = list_parse2(tmp[tmp$sex == 1 & tmp$condition == 0, c("jittered_age", "value")]), 
                       showInLegend = FALSE, color = "cornflowerblue", name = "Male - Neg",
                       marker = list(radius = 7, symbol = "cross")) %>%
-        hc_add_series(data = list_parse2(tmp[tmp$sex == 1 & !(tmp$condition %in% c(0, 1)), c("age", "value")]), 
+        hc_add_series(data = list_parse2(tmp[tmp$sex == 1 & !(tmp$condition %in% c(0, 1)), c("jittered_age", "value")]), 
                       showInLegend = FALSE, color = "cornflowerblue", name = "Male - Unknown",
                       marker = list(radius = 5, symbol = "circle")) 
     }
@@ -1242,13 +1271,13 @@ Scatter_MEvsAge <- function(MEexpressionData, module, colored, shaped, donorCond
     { 
       g <- g %>%
         #Female and conditions
-        hc_add_series(data = list_parse2(tmp[tmp$sex == 2 & tmp$condition == 1, c("age", "value")]), 
+        hc_add_series(data = list_parse2(tmp[tmp$sex == 2 & tmp$condition == 1, c("jittered_age", "value")]), 
                       showInLegend = FALSE, color = "hotpink", name = "Female - Pos",
                       marker = list(radius = 7, symbol = "triangle")) %>%
-        hc_add_series(data = list_parse2(tmp[tmp$sex == 2 & tmp$condition == 0, c("age", "value")]), 
+        hc_add_series(data = list_parse2(tmp[tmp$sex == 2 & tmp$condition == 0, c("jittered_age", "value")]), 
                       showInLegend = FALSE, color = "hotpink", name = "Female - Neg",
                       marker = list(radius = 7, symbol = "cross")) %>%
-        hc_add_series(data = list_parse2(tmp[tmp$sex == 2 & !(tmp$condition %in% c(0, 1)), c("age", "value")]), 
+        hc_add_series(data = list_parse2(tmp[tmp$sex == 2 & !(tmp$condition %in% c(0, 1)), c("jittered_age", "value")]), 
                       showInLegend = FALSE, color = "hotpink", name = "Female - Unknown",
                       marker = list(radius = 5, symbol = "circle")) 
     }
@@ -1297,15 +1326,15 @@ Scatter_MEvsAge <- function(MEexpressionData, module, colored, shaped, donorCond
       {
         g <- g %>%
           hc_add_series(data = list_parse2(tmp[tmp$coloredBy == unique(tmp$coloredBy)[i] & tmp$condition == 1, 
-                                               c("age", "value")]),
+                                               c("jittered_age", "value")]),
                         marker = list(radius = 5, symbol = "triangle"), 
                         color = mycolor[i], showInLegend = F) %>%
           hc_add_series(data = list_parse2(tmp[tmp$coloredBy == unique(tmp$coloredBy)[i] & tmp$condition == 0, 
-                                               c("age", "value")]),
+                                               c("jittered_age", "value")]),
                         marker = list(radius = 5, symbol = "cross"), 
                         color = mycolor[i], showInLegend = F) %>%
           hc_add_series(data = list_parse2(tmp[tmp$coloredBy == unique(tmp$coloredBy)[i] & !(tmp$condition %in% c(0, 1)), 
-                                               c("age", "value")]),
+                                               c("jittered_age", "value")]),
                         marker = list(radius = 5, symbol = "circle"), 
                         color = mycolor[i], showInLegend = F)
         # if (nrow(tmp[tmp$coloredBy == unique(tmp$coloredBy)[i],]) >= 10)
@@ -1338,6 +1367,7 @@ Scatter_MEvsAge <- function(MEexpressionData, module, colored, shaped, donorCond
       mycolor <- colorRampPalette(RColorBrewer::brewer.pal(9, "Reds"))(length(seq(floor(round(min(tmp$coloredBy), 1)), ceiling(round(max(tmp$coloredBy), 1)), by = 0.1)))
       tmp$colorCondition <- mycolor[match(tmp$coloredBy[order(tmp$coloredBy)], round(seq(min(tmp$coloredBy), max(tmp$coloredBy), by = 0.1), 1))]
       
+      tmp$age <- tmp$jittered_age
       
       g <- highchart() %>%
         hc_chart(type = "scatter") %>%
@@ -1563,7 +1593,8 @@ Line_signficanceAlterationsvsAge <- function(gene, pvalueData, geneData, tissue,
   #GE info
   GE <- geneData
   GE <- GE[GE$tissue == tissue,]
-  
+  GE$jittered_age <- jitter_ages(GE$age)
+   
   if (coloredBy == "Age")
   {
     
@@ -1589,7 +1620,7 @@ Line_signficanceAlterationsvsAge <- function(gene, pvalueData, geneData, tissue,
              lineColor = "yellowgreen", lineWidth = 2,
              labels = list(style = list(color = "yellowgreen")))
       ) %>% 
-      hc_add_series(data = list_parse2(GE[, c("age", "expression")]), type = "scatter", showInLegend = FALSE,
+      hc_add_series(data = list_parse2(GE[, c("jittered_age", "expression")]), type = "scatter", showInLegend = FALSE,
                     yAxis = 1, color = "yellowgreen", marker = list(radius = 4, symbol = "round")) %>% 
       # hc_add_series(data = list_parse2(data.frame(fit$age, fit$.fitted - 2*fit$.se.fit, fit$.fitted + 2*fit$.se.fit)), yAxis = 1,
       #               type = "arearange", showInLegend = FALSE, color = "lightgrey") %>%
@@ -1633,9 +1664,9 @@ Line_signficanceAlterationsvsAge <- function(gene, pvalueData, geneData, tissue,
              lineColor = "grey", lineWidth = 2,
              labels = list(style = list(color = "grey")))
       ) %>% 
-      hc_add_series(data = list_parse2(GE[GE$sex == 1, c("age", "expression")]), type = "scatter", name = "Male",
+      hc_add_series(data = list_parse2(GE[GE$sex == 1, c("jittered_age", "expression")]), type = "scatter", name = "Male",
                     yAxis = 1, color = "cornflowerblue", marker = list(radius = 4, symbol = "round")) %>% 
-      hc_add_series(data = list_parse2(GE[GE$sex == 2, c("age", "expression")]), type = "scatter", name = "Female",
+      hc_add_series(data = list_parse2(GE[GE$sex == 2, c("jittered_age", "expression")]), type = "scatter", name = "Female",
                     yAxis = 1, color = "hotpink", marker = list(radius = 4, symbol = "round")) %>% 
       hc_add_series(data = list_parse2(data.frame(fit_male$age, fit_male$.fitted)), yAxis = 1, lineWidth = 5,
                     type = "line", showInLegend = FALSE, color = "cornflowerblue") %>% 
