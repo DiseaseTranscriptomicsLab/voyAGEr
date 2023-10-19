@@ -84,12 +84,13 @@ Line_sigGenesvsAge <- function(tissue, variable, peak)
   return(g)
 }
 
-Line_pvaluevsAge <- function(gene, pvalueData, geneData, tissue, coloredBy)
+Line_pvaluevsAge <- function(gene, pvalueData, geneData, allAges, tissue, coloredBy)
 {
   #GE info
   GE <- geneData
   GE <- GE[GE$tissue == tissue,] 
   GE$jittered_age <- jitter_ages(GE$age)
+  statsAllAges_text <- paste0("Overall changes: p-value = ", round(allAges$pvalue,4), " | t-statistic = ", round(allAges$tvalue,2))
   
    
   if (coloredBy == "Age")
@@ -168,6 +169,10 @@ Line_pvaluevsAge <- function(gene, pvalueData, geneData, tissue, coloredBy)
                                 }"), useHTML = TRUE)
     
   }
+  
+  g <- g %>% 
+    hc_subtitle(text = statsAllAges_text) 
+  
   return(g)
 }
 
@@ -1588,13 +1593,15 @@ Line_FishertestEnrichmentManualvsAge <- function(p, gene, threshold)
   
 }
 
-Line_signficanceAlterationsvsAge <- function(gene, pvalueData, geneData, tissue, coloredBy)
+Line_signficanceAlterationsvsAge <- function(gene, pvalueData, geneData, allAges, tissue, coloredBy)
 {
   #GE info
   GE <- geneData
   GE <- GE[GE$tissue == tissue,]
   GE$jittered_age <- jitter_ages(GE$age)
-   
+  statsAllAges_text <- paste0("Overall changes: p-value = ", round(allAges$pvalue,4), " | t-statistic = ", round(allAges$tvalue,2))
+    
+    
   if (coloredBy == "Age")
   {
     
@@ -1683,6 +1690,10 @@ Line_signficanceAlterationsvsAge <- function(gene, pvalueData, geneData, tissue,
                                 }"), useHTML = TRUE)
     
   }
+  
+  g <- g  %>% 
+    hc_subtitle(text = statsAllAges_text) 
+  
   return(g)
 }
 

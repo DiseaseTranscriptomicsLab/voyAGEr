@@ -120,6 +120,35 @@ shinyServer(
       }
       pvalueData
     })
+    
+    #significance and t value for a single gene, tissue and variable
+    Sig_Mag_Gene_perTissueVariable <- reactive({
+      gene <- input$gene
+      variable <- input$variable_Gene_Alteration
+      tissue <- input$tissue
+      validate(need(!is.null(tissue) & tissue != "" & tissue != "All tissues", ""))
+      modifiedTissuename <- gsub("-", "_", tissue)
+      modifiedTissuename <- gsub(" ", "", modifiedTissuename)
+      modifiedTissuename <- gsub("\\(", "", modifiedTissuename)
+      modifiedTissuename <- gsub("\\)", "", modifiedTissuename)
+      
+      if (tissue %in% c("Ovary", "Uterus", "Vagina", "Prostate", "Fallopian Tube", "Testis") & variable %in% c("Gender", "Int_Age_Gender"))
+      {
+        result <- NULL
+      } else
+      {
+ 
+        #RDS files online
+        result <- readRDS(paste("data/DB_pvalue_ShARP-LM_EntireAgeRange/",
+                                    modifiedTissuename, "_", variable, ".RDS",
+                                    sep = ""))
+        #result <- result[result$gene == gene,]
+        result <- result[, -c(4)]
+      }
+      result
+    })
+    
+    
 
     #p gather significance for all genes given a tissue and a variable
     p <- reactive({
@@ -489,6 +518,7 @@ shinyServer(
       tissue <- input$tissue
       validate(need(!is.null(tissue) & tissue != "" & tissue != "All tissues", ""))
       pvalueData <- p_Alteration_gene()
+      statsAllAges <- Sig_Mag_Gene_perTissueVariable()[Sig_Mag_Gene_perTissueVariable()$gene==gene,]
       # title <- paste(gene, " ",
       #                "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'> <img src='NCBI.png' title='NCBI' height='30px' style='padding-bottom:5px;'/></a>",
       #                "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'> <img src='geneCards.png' title='GeneCards' height='30px' style='padding-bottom:5px;'/></a>",
@@ -502,7 +532,7 @@ shinyServer(
       validate(need(!is.null(pvalueData), "No possible analysis for this alteration in this tissue"))
 
       variable <- ifelse(variable == "Age", "Age", ifelse(variable == "Gender", "Sex", "Age&Sex")) #change name for download filename
-      g <- Line_signficanceAlterationsvsAge(gene, pvalueData, geneData = geneData(), tissue, coloredBy =  variable) %>%
+      g <- Line_signficanceAlterationsvsAge(gene, pvalueData, geneData = geneData(), allAges = statsAllAges, tissue, coloredBy =  variable) %>%
         hc_title(text = title, useHTML = T) %>%
         hc_exporting(enabled = T,
                      filename = paste("voyAGEr_Alteration_", gene, "_across_", variable, "_", tissue, sep = ''),
@@ -650,10 +680,11 @@ shinyServer(
 
       variable <- input$variable_model_2
       variable <- ifelse(variable == "Age", "Age", ifelse(variable == "Gender", "Sex", "Age&Sex")) #change name for download filename
-
-      g <- Line_pvaluevsAge(gene = gene, pvalueData = pvalueData, geneData = geneData_Tissue(), tissue = tissue, coloredBy = coloredBy) %>%
-        hc_title(text = gene) %>%
-        hc_subtitle(text = geneInfo)
+      statsAllAges <- Sig_Mag_Gene_perTissueVariable()[Sig_Mag_Gene_perTissueVariable()$gene==gene,]
+      
+      g <- Line_pvaluevsAge(gene = gene, pvalueData = pvalueData, geneData = geneData_Tissue(), allAges = statsAllAges, tissue = tissue, coloredBy = coloredBy) %>%
+        hc_title(text = gene) #%>%
+        #hc_subtitle(text = geneInfo)
       g %>%
         hc_exporting(enabled = T,
                      filename = paste("voyAGEr_Alteration_across_", variable, "_", gene, "_", tissue, sep = ''),

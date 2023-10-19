@@ -149,7 +149,8 @@ shinyUI(fluidPage(
                                                                                tags$h4("Gene expression alterations over age"),
                                                                                #Description text different for each variable
                                                                                conditionalPanel(condition = "input.variable_Gene_Alteration == 'Age'",
-                                                                                                HTML("The gene expression progression over age (top panel) is seen in parallel with its expression alteration's significance (bottom panel)."),
+                                                                                                HTML("The gene expression progression over age (top panel) is seen in parallel with its expression alteration's significance (bottom panel).
+                                                                                                     <br> The overall p-value and t-statistic was computed using the entire age range."),
                                                                                ),
                                                                                conditionalPanel(condition = "input.variable_Gene_Alteration == 'Gender'",
                                                                                                 HTML("The sex-specific gene expression progression over age (top panel) is seen in parallel with the significance of the difference in expression between sexes (bottom panel)."),
@@ -225,7 +226,8 @@ shinyUI(fluidPage(
                                                                       conditionalPanel(condition = "output.selectedGene != 'none' || isNaN(output.selectedGene)",
                                                                                        column(width = 12,
                                                                                               tags$h4("Gene expression alterations over age"),
-                                                                                              HTML("For a given gene, its expression progression over age (bottom panel) is seen in parallel with its expression alteration's significance (top panel)."),
+                                                                                              HTML("For a given gene, its expression progression over age (bottom panel) is seen in parallel with its expression alteration's significance (top panel).
+                                                                                                   <br> The overall p-value and t-statistic was computed using the entire age range."),
                                                                                               highchartOutput("Line_pvaluevsAge", height = "500px"))
                                                                       )
                                                              ),
