@@ -411,7 +411,7 @@ shinyServer(
                                                          symbolStrokeWidth = 4,
                                                          symbolSize = 20,
                                                          symbolStroke = '#4D4D4D',
-                                                         symbol = "menu")))
+                                                         symbol = "menu"))) 
 
     })
 

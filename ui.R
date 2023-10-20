@@ -361,8 +361,11 @@ shinyUI(fluidPage(
                                                                                    column(width = 12, 
                                                                                           tags$h4("Disease enrichment"),
                                                                                           conditionalPanel(condition = "input.selectedModule == 'All modules' && input.diseaseMethod == 'DisGeNET'",
-                                                                                                           HTML("The significance of the module’s enrichment in <a href='https://www.disgenet.org/search' target='_blank'>DisGeNET</a> gene-disease associations (from the <code>CURATED</code> set) is calculated with the disgenet2r package <a href='https://www.disgenet.org/static/disgenet2r/disgenet2r.html' target='_blank'>(Piñero et al.)</a>.
-                                                                                               <br>P-values were corrected for multiple testing with Benjamini-Hochberg’s FDR."),
+                                                                                                           HTML("The significance of the module’s enrichment in <a href='https://www.disgenet.org/search' 
+                                                                                                           target='_blank'>DisGeNET</a> gene-disease associations (from the <code>CURATED</code> set) 
+                                                                                                           is calculated with the disgenet2r package <a href='https://www.disgenet.org/static/disgenet2r/disgenet2r.html' 
+                                                                                                           target='_blank'>(Piñero et al.)</a>.
+                                                                                                           P-values were corrected for multiple testing with Benjamini-Hochberg’s FDR."),
                                                                                                            withSpinner(highchartOutput("Heatmap_moduleDiseaseEnrichment_All", height = "600px"), 
                                                                                                                        color = "#2C3E50", type = 5, size = 0.5)
                                                                                           ),
@@ -423,10 +426,10 @@ shinyUI(fluidPage(
                                              )
                                    )
                                  ))
-             ),
-             tabPanel("Tutorial", 
-                      icon = icon("file-text"),
-                      tags$iframe(style="height:800px; width:100%", src="tuto.pdf"))
+             )#,
+            #tabPanel("Tutorial", 
+                     # icon = icon("file-text"),
+                     # tags$iframe(style="height:800px; width:100%", src="voyAGEr-WebAppTutorial.html"))
   )
   
   

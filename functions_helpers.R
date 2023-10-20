@@ -1039,8 +1039,7 @@ Heatmap_LoessMEvsAge <- function(age)
 }
 
 Scatter_MEvsAge <- function(MEexpressionData, module, colored, shaped, donorCondition, technicalCondition)
-{
-  #browser()
+{ 
   tmp <- MEexpressionData[MEexpressionData$module == module,]
   tmp$jittered_age <- jitter_ages(tmp$age)
   
