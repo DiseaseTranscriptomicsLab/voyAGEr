@@ -1,0 +1,795 @@
+---
+title: "voyAGEr - Web App Tutorial"
+output: bookdown::html_document2
+editor_options: 
+  markdown: 
+    wrap: sentence
+---
+
+```{css, echo=FALSE}
+body {
+  font-family: "Arial", sans-serif;
+}
+```
+
+```{=html}
+<style>
+.figure img {
+  width: 100%;
+  height: auto;
+  
+}
+</style>
+
+<style type="text/css">
+  body{
+  font-size: 12pt;
+}
+</style>
+```
+```{r setup, include=FALSE}
+knitr::opts_knit$set(echo = TRUE,  
+                     root.dir = "~/VersionControl/voyAGEr/") 
+
+knitr::opts_chunk$set(echo = FALSE, 
+                      warning = FALSE, 
+                      messages = FALSE, 
+                      include = TRUE,
+                      out.width="100%")
+
+source(file = "~/VersionControl/voyAGEr/functions_helpers.R")
+```
+
+```{r message=F}
+library(viridis)
+library(RSQLite)
+library(manipulateWidget)
+library(highcharter)
+library(tm)
+library(reshape2)
+library(plyr)
+library(htmltools)
+library(RColorBrewer)
+library(shiny)
+library(shinyBS)  
+library(data.table)
+```
+
+```{r include=FALSE}
+
+    peak <- readRDS("data/peaks_plot_2.RDS") #to know the FDR for each peak for FDRvsAge
+    AgeWavesList <- readRDS("data/FDR_Interpolation_Tissue.RDS")
+    geneList <- readRDS("data/DT_NbTissuePerGene.RDS")
+    donorCondition <- readRDS("data/donorCondition.RDS")
+    conditionID <- readRDS("data/conditionID.RDS")
+    technicalCondition <- readRDS("data/technicalCondition.RDS")
+    Cluster_Reactome <- readRDS("data/Cluster_Reactome.RDS")
+    Cluster_Reactome_affiliation <- readRDS("data/Reactome_cluster_Affiliation.RDS")
+    moduleInfo <- readRDS("data/moduleInfo_Corrected_Atlas_v4.RDS") 
+     
+```
+
+```{r}
+Sig_Mag_Gene_perTissueVariable <- function(){
+      
+      modifiedTissuename <- gsub("-", "_", tissue)
+      modifiedTissuename <- gsub(" ", "", modifiedTissuename)
+      modifiedTissuename <- gsub("\\(", "", modifiedTissuename)
+      modifiedTissuename <- gsub("\\)", "", modifiedTissuename)
+      
+      if (tissue %in% c("Ovary", "Uterus", "Vagina", "Prostate", "Fallopian Tube", "Testis") & variable %in% c("Gender", "Int_Age_Gender"))
+      {
+        result <- NULL
+      } else
+      {
+ 
+        #RDS files online
+        result <- readRDS(paste("data/DB_pvalue_ShARP-LM_EntireAgeRange/",
+                                    modifiedTissuename, "_", variable, ".RDS",
+                                    sep = ""))
+        #result <- result[result$gene == gene,]
+        result <- result[, -c(4)]
+      }
+      result
+    }
+    
+
+    geneData <- function(){ 
+      gene <- gsub("-", "_", gene) # '-' creates issues when calling database so '-' were replaced by "_" in the database's names 
+      #RDS files online
+      a <- readRDS(paste("data/DB_GeneExpressionV2/",
+                         gene, ".RDS", sep = ""))
+      a
+    }
+```
+
+# First steps
+
+voyAGEr is freely available at [[https://compbio.imm.medicina.ulisboa.pt/voyAGEr]{.ul}](https://compbio.imm.medicina.ulisboa.pt/voyAGEr)
+
+voyAGEr is composed of four main sections (the tabs in the navigation bar at the top):
+
+-   **`Home`** (depicted by the home icon  and no literal titling): to visually explain the used  methodand its associated findings featured in the application.
+
+-   **`Gene`**: to lead a gene-centric investigation, namely to assess how the expression of a specificgene changes with age and sex in a specific tissue.
+
+-   **`Tissue`**: to analyse how tissue-specific transcriptomes change with age and sex.
+
+-   **`Module`**: to further examine sets of co-expressed genes whose expression is altered with age namely through their enrichment in specific cell types, biological pathways and association with diseases. 
+
+voyAGEr leverages RNA-seq datasets from the GTEx project (Lonsdale et al., 2013), encompassing tissue samples from hundreds of donors aged from 20 to 70 years.
+
+# Case-study 1: Senescence-associated genes
+
+Cellular senescence is a stress-induced cell cycle arrest limiting proliferation of potentially oncogenic cells but progressively creating an inflammatory environment in tissues as they age and therefore an example of a process whose molecular mechanisms are of particular interest to ageing researchers (Gorgoulis et al., 2019; Van Deursen, 2014).
+
+Senescence markers, such as *CDKN2A*, encoding cell cycle regulatory protein p16INK4A thataccumulates in senescent cells (Erickson et al., 1998; Gil & Peters, 2006), can thus be studied as putative markers of ageing of certain tissues.
+
+To examine CDKN2A expression changes across age:
+
+1.  Go to the **Gene section**
+
+2.  Type **CDKN2A** in the **Gene field**
+
+> Note that gene names in voyAGEr are HGNC (HUGO Gene Nomenclature Committee) symbols.
+> For each gene, the respective NCBI and GeneCards webpages can be accessed by clicking on their logos next to its name on plot's title.
+
+3.  In the **Profile sub-tab**, the user can explore a heatmap of tissue-specific CDKN2A scaled expression (Z-scores) across age, for all tissues (Figure \@ref(fig:CDKN2Aheatmap)).
+4.  In the **Alteration sub-tab**, the user can explore a heatmap of significance of tissue-specific CDKN2A expression age-related alterations due to Age, Sex or Age&Sex (depending on the user's choice -- **Alterations associated with field** on the left), for all tissues. By choosing All tissues and Age in the ***Tissue*** and ***Alterations associated with*** **fields**, respectively, a heatmap like that of **Figure** \@ref(fig:CDKN2Aheatmasigp) is featured.
+
+```{r include=F}
+
+# Set the directory where the files are located
+data <- "/mnt/scratch/home/CommonProjects/voyAGEr_2023/AppData_Sept2023"
+gene <- "CDKN2A"
+# Construct the full file path
+file_path <- paste0(data,"/DB_GeneExpressionV2/", gene,".RDS") 
+   
+# Add the data frame to the list, naming the list element with the gene name
+geneExpr_CDKN2A <- readRDS(file_path)
+
+```
+
+```{r include=F}
+Heatmap_LoessGEvsAge <- function(data)
+{
+  #a <- dbGetQuery(DBconnection, paste("SELECT * FROM", "A1BG_AS1", sep = " "))
+  a <- data
+  b <- data.frame()
+  for (k in unique(a$tissue))
+  {
+    fit <- a[a$tissue == k,]
+    fit <- loess(expression ~ age, data = fit)
+    b <- rbind(b, data.frame(age = 20:70, expression = predict(fit, 20:70), tissue = k))
+  }
+  b <- dcast(b, tissue~age, value.var = "expression")
+  rownames(b) <- b$tissue
+  b <- b[,-1]
+  b <- t(scale(t(b), scale = F))
+  i <- (hclust(dist(b)))
+  
+  b <- b[i$order, ]
+  #b[is.na(b)] <- -100
+  b <- melt(b)
+  colnames(b) <- c("tissue", "age", "expression")
+ 
+  g <- hchart(b, type = "heatmap", hcaes(x = age, y = tissue, value = expression)) %>%
+    hc_colorAxis(stops = list(list(0.3, "dodgerblue"), list(0.5, "white"), list(0.7, "tomato")),
+                 min = -2, max = 2,
+                 reversed = F) %>%
+    hc_tooltip(formatter = JS("function(){if (!this.point.options.expression) 
+                            {return '<b>Age</b>: ' + this.point.age + ' y.o., <br><b>Tissue</b>: ' + this.point.tissue + ',<br><b>scaled GE </b>: No data'}
+  else
+  {return '<b>Age</b>: ' + this.point.age + ' y.o., <br><b>Tissue</b>: ' + this.point.tissue + ',<br><b>scaled GE</b>: ' + Highcharts.numberFormat(this.point.options.expression, 2);}
+                            }")) %>%
+    hc_legend(title = list(text = "<center>Gene Expression<br>(Z-scores)</center>", style = list(fontSize = '16px')),align = "right", layout = "vertical", verticalAlign = "top",reversed = TRUE) %>%
+    hc_xAxis(title = list(text = "Age (years)", style = list(fontSize = '18px')),
+             labels = list(style = list(fontSize = "14px"))) %>%
+    hc_yAxis(title = list(text = "Tissue", style = list(fontSize = '18px'))) 
+  
+  
+  
+  return(g)
+}
+```
+
+```{r CDKN2Aheatmap, fig.align = 'center', fig.cap="Heatmap of tissue-specific CDKN2A expression over age."}
+
+title <- paste(gene, " ",
+               "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'>NCBI</a>",
+               " | ",
+               "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'>GeneCards</a>",
+               sep = "")
+
+g <- Heatmap_LoessGEvsAge(geneExpr_CDKN2A)
+g %>%
+  hc_title(text = title,
+           useHTML = T) %>%
+  hc_exporting(enabled = T,
+               filename = paste("voyAGEr_Profile_", gene, "_acrossTissues"),
+               buttons = list(contextButton = list(align = "left",
+                                                   symbolStrokeWidth = 4,
+                                                   symbolSize = 20,
+                                                   symbolStroke = '#4D4D4D',
+                                                   symbol = "menu")))
+      
+ 
+```
+
+```{r}
+p_Alterations <- function(){
+  
+      variable <- "Age"
+       
+      tissue <- geneList$tissue[[match(gene, geneList$gene)]]
+      modifiedTissuename <- gsub("-", "_", tissue)
+      modifiedTissuename <- gsub(" ", "", modifiedTissuename)
+      modifiedTissuename <- gsub("\\(", "", modifiedTissuename)
+      modifiedTissuename <- gsub("\\)", "", modifiedTissuename)
+
+      p <- data.frame()
+      for (i in 1:length(modifiedTissuename))
+      {
+        if (tissue[i] %in% c("Ovary", "Uterus", "Vagina", "Prostate", "Fallopian Tube", "Testis") & variable %in% c("Gender", "Int_Age_Gender"))
+        {
+          tmp <- NULL
+        } else
+        { 
+          tmp <- readRDS(paste("data/DB_pvalue_ShARP-LM/",
+                               modifiedTissuename[i], "_",
+                               variable, ".RDS", sep = "")) 
+          tmp <- tmp[tmp$gene == gene,]
+          tmp <- tmp[, -1]
+          tmp <- -log10(tmp) 
+          fit <- smooth.spline(as.numeric(colnames(tmp)), tmp)
+          fit <- predict(fit, seq(26, 64, by = 0.5))$y
+          tmp <- data.frame(t(fit))
+          colnames(tmp) <- seq(26, 64, by = 0.5)
+          rownames(tmp) <- tissue[i]
+        }
+        p <- rbind(p, tmp)
+      }
+      p
+    }
+```
+
+```{r CDKN2Aheatmasigp, fig.align = 'center', fig.cap="Heatmap of significance of tissue-specific Age-associated CDKN2A expression alterations over age."}
+
+variable <- "Age"  
+      title <- paste(gene, " ",
+                     "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'>NCBI</a>",
+                     " | ",
+                     "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'>GeneCards</a>",
+                     sep = "") 
+      g <- Heatmap_signficanceAlterationsvsAge(p_Alterations())
+      g %>%
+        hc_title(text = title,
+                     useHTML = T) %>%
+        hc_exporting(enabled = T,
+                     filename = paste("voyAGEr_Alteration_", gene, "_across_", variable, sep = ''),
+                     buttons = list(contextButton = list(align = "left",
+                                                         symbolStrokeWidth = 4,
+                                                         symbolSize = 20,
+                                                         symbolStroke = '#4D4D4D',
+                                                         symbol = "menu")))
+
+```
+
+5.  Enter/select *Lung* in the ***Tissue*** **field** to investigate *CDKN2A* expression changes in that specific tissue.
+
+    Plots of *CDKN2A* expression (top panel,identical to that in the *Profile* sub-tab) and the significance of its alterations over age (bottom panel) are then featured (**Figure** \@ref(fig:CDKN2Apeaks)).
+    Significant *CDKN2A* expression changes are observed in around 30 years-old, late forties and mid fifties.
+
+    The user can also check the the overall changes of *CDKN2A* with age, represented as the subtitle of this figure.
+    These are the results of fitting the ShARP-LM model on the entire age range, providing both p-value and t-value.
+    A positive t-value represents an increase of expression with age.
+
+```{r}
+p <- function(){
+      
+        modifiedTissuename <- gsub("-", "_", tissue)
+        modifiedTissuename <- gsub(" ", "", modifiedTissuename)
+        modifiedTissuename <- gsub("\\(", "", modifiedTissuename)
+        modifiedTissuename <- gsub("\\)", "", modifiedTissuename) 
+        p <- readRDS(paste("data/DB_pvalue_ShARP-LM/",
+                           modifiedTissuename, "_", variable,
+                           ".RDS", sep = ""))
+ 
+        rownames(p) <- p$gene
+        p <- p[,-1]
+      
+      return(p)
+    }
+```
+
+```{r}
+
+    #alterations significance for a single gene, tissue and variable
+    p_Alteration_gene <- function(){
+     
+      modifiedTissuename <- gsub("-", "_", tissue)
+      modifiedTissuename <- gsub(" ", "", modifiedTissuename)
+      modifiedTissuename <- gsub("\\(", "", modifiedTissuename)
+      modifiedTissuename <- gsub("\\)", "", modifiedTissuename)
+
+      if (tissue %in% c("Ovary", "Uterus", "Vagina", "Prostate", "Fallopian Tube", "Testis") & variable %in% c("Gender", "Int_Age_Gender"))
+      {
+        pvalueData <- NULL
+      } else
+      { 
+        #RDS files online
+        pvalueData <- readRDS(paste("data/DB_pvalue_ShARP-LM/",
+                                    modifiedTissuename, "_", variable, ".RDS",
+                                    sep = ""))
+        pvalueData <- pvalueData[pvalueData$gene == gene,]
+        pvalueData <- pvalueData[, -1]
+      }
+      pvalueData
+    }
+    
+```
+
+```{r CDKN2Apeaks, fig.align = 'center', fig.cap="CDKN2A expression in the lung (top panel) and significance of its alterations (bottom panel) over age."}
+
+tissue <- "Lung"
+      pvalueData <- p_Alteration_gene()
+      statsAllAges <- Sig_Mag_Gene_perTissueVariable()[Sig_Mag_Gene_perTissueVariable()$gene==gene,] 
+      title <- paste(gene, " ",
+                     "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'>NCBI</a>",
+                     " | ",
+                     "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'>GeneCards</a>",
+                     sep = "")
+ 
+
+      variable <- ifelse(variable == "Age", "Age", ifelse(variable == "Gender", "Sex", "Age&Sex")) #change name for download filename
+      
+      g <- Line_signficanceAlterationsvsAge(gene, pvalueData, geneData = geneData(), allAges = statsAllAges, tissue, coloredBy =  variable) %>%
+        hc_title(text = title, useHTML = T) %>%
+        hc_exporting(enabled = T,
+                     filename = paste("voyAGEr_Alteration_", gene, "_across_", variable, "_", tissue, sep = ''),
+                     buttons = list(contextButton = list(align = "left",
+                                                         symbolStrokeWidth = 4,
+                                                         symbolSize = 20,
+                                                         symbolStroke = '#4D4D4D',
+                                                         symbol = "menu")))
+      
+      g
+```
+
+6.  Go to the ***Profile*** **sub-tab**. voyAGEr can also associate *CDKN2A* expression in the lung with the donors' sex and medical history. These clinical data are displayed in a table below  theexpression profile's scatter plot.
+
+> GTEx transcriptomic data are from "healthy" tissue samples from donors  that had, nonetheless, reported medical conditions (Lonsdale et al., 2013). 
+>  
+
+7.  Click on *Sex* in the ***Coloured*** **by** field,leaving *All* in the ***Shaped by*** **field.**
+
+    *CDKN2A* lung expression progression with age appears to be influenced by the donors' sex, particularly in the mid-thirties (**Figure** \@ref(fig:CDKN2Apeakssex)).
+    This observation can be statistically tested in the ***Alteration*** **sub-tab** by clicking on *Sex* in the ***Alterations associated with*** **field**.
+
+    1.  Back in the *Profile* sub-tab, click on *All* in the ***Coloured*** **by** fieldand on *Condition* inthe ***Shaped by*** field**.** Enter/select *MHCOPD* in the ***Select*** field.
+
+        The *CDKN2A* lung expression profile is herein associated with medical conditions(positive if the donor suffered from the condition, negative if not and unknown if theassociation is uncharted).
+        Moreover, the median gene expression values for positiveand negative conditions are displayed.
+        The significance of Kruskal-Wallis tests for thedifference in gene expression medians between positive and negative donors is usedto rank conditions.
+        In this case, the condition selected (Chronic Respiratory Disease) is amongst those displaying a significant difference in median (adjusted p-value below 0.05).
+        On the scatter plot with *CDKN2A* lung expression over age, the curvesfitted independently for positive and negative conditions show that such  difference ingene expression occurs mostly after the age of 50 (**Figure** \@ref(fig:CDKN2ApeaksMHCOPD)).
+
+> **Limitations**: In the GTEx dataset, there are conditions for which very few donors are positive and others for which very few donors have their condition state annotated. 
+> The significance of the Kruskal-Wallis tests must therefore be regarded with caution and as providing limited information. 
+> In this case, for example, even though significant differences in median were found for the Chronic Respiratory Disease, the low number of positive samples and their concentration in limited age ranges hamper any solid conclusion.
+
+```{r CDKN2Apeakssex, fig.align = 'center', fig.cap="CDNK2A expression in the lung, discriminated between donors sex (female in pink, male in blue) over age."}
+
+
+      gene <- "CDKN2A"
+      variable <- "Gender"
+      tissue <- "Lung"
+      
+
+      pvalueData <- p_Alteration_gene()
+      statsAllAges <- Sig_Mag_Gene_perTissueVariable()[Sig_Mag_Gene_perTissueVariable()$gene==gene,] 
+      title <- paste(gene, " ",
+                     "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'>NCBI</a>",
+                     " | ",
+                     "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'>GeneCards</a>",
+                     sep = "")
+ 
+
+
+      
+      g <- Line_signficanceAlterationsvsAge(gene, pvalueData, geneData = geneData(), allAges = statsAllAges, tissue, coloredBy =  variable) %>%
+        hc_title(text = title, useHTML = T) %>%
+        hc_exporting(enabled = T,
+                     filename = paste("voyAGEr_Alteration_", gene, "_across_", variable, "_", tissue, sep = ''),
+                     buttons = list(contextButton = list(align = "left",
+                                                         symbolStrokeWidth = 4,
+                                                         symbolSize = 20,
+                                                         symbolStroke = '#4D4D4D',
+                                                         symbol = "menu")))
+      
+      g
+```
+
+```{r  CDKN2ApeaksMHCOPD, fig.align = 'center', fig.cap="CDNK2A expression in the lung, discriminated between donors with (green) and without (orange) Chronic Respiratory Disease, over age."}
+
+      gene <- "CDKN2A"
+      variable <- "Gender"
+      tissue <- "Lung" 
+
+      colored <- "none"
+      geneInfo <- geneList$info[match(gene, geneList$gene)]
+      condition <- "Chronic Respiratory Disease (Chronic Obstructive Pulmonary Syndrome (COPD) OR Chronic Lower Respiratory Disease (CLRD) (chronic bronchitis, emphysema, asthma))"
+     
+      title <- paste(gene, " ",
+                     "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'>NCBI</a>",
+                     " | ",
+                     "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'>GeneCards</a>",
+                     sep = "")
+      g <- scatter_GEvsAge(geneData(), tissue, colored = colored, shaped = condition,
+                           donorCondition = donorCondition, gene = gene, geneInfo = geneInfo)
+      g %>%
+        hc_title(text = title,
+                 useHTML = T) %>%
+        hc_exporting(enabled = T,
+                     filename = paste("voyAGEr_Profile_", gene, "_", tissue, sep = ''),
+                     buttons = list(contextButton = list(align = "left",
+                                                         symbolStrokeWidth = 4,
+                                                         symbolSize = 20,
+                                                         symbolStroke = '#4D4D4D',
+                                                         symbol = "menu"))) 
+
+```
+
+# Case-study 2: Transcriptional changes in the *Subcutaneous Adipose Tissue*
+
+1.  Go to the ***Tissue*** **section.**
+
+    The landscape of *Age*-, *Sex*-and *Age&Sex*-associated global gene expression alterations along age for all tissues can be profiled using the significance of proportions of differentially expressed genes. 
+    Three periods stand out with significant transcriptional changes associated with *Age* (keeping the default *All tissues* in the ***Tissue*** **field** and *Age* in the ***Alterations associated with*** **field**), after 55 years old (**Figure** \@ref(fig:tissueAlterationsAge)).
+    Moreover, most of the significant transcriptional differences between sexes appear to occur in the fifth and sixth decades of life (*All tissues* in the ***Tissue*** **field** and *Sex* in the ***Alterations associated with*** **field**) (**Figure** \@ref(fig:tissueAlterationsSex)).
+
+```{r tissueAlterationsAge, fig.align = 'center', fig.cap="Heatmap of significance of tissue-specific Age-associated global gene expression alterations over age."}
+ variable <- "Age" 
+ 
+      g <- Heatmap_log10FDRvsAge(variable = variable, AgeWaves = AgeWavesList)
+
+      variable <- ifelse(variable == "Age", "Age", ifelse(variable == "Gender", "Sex", "Age&Sex"))  
+      
+      g %>%
+        hc_exporting(enabled = T,
+                     filename = paste("voyAGEr_Alteration_across_", variable, sep = ''),
+                     buttons = list(contextButton = list(align = "left",
+                                                         symbolStrokeWidth = 4,
+                                                         symbolSize = 20,
+                                                         symbolStroke = '#4D4D4D',
+                                                         symbol = "menu")))
+```
+
+```{r tissueAlterationsSex, fig.align = 'center', fig.cap="Heatmap of significance of tissue-specific Sex-associated global gene expression alterations over age."}
+ variable <- "Gender" 
+ 
+      g <- Heatmap_log10FDRvsAge(variable = variable, AgeWaves = AgeWavesList)
+
+      variable <- ifelse(variable == "Age", "Age", ifelse(variable == "Gender", "Sex", "Age&Sex"))  
+      
+      g %>%
+        hc_exporting(enabled = T,
+                     filename = paste("voyAGEr_Alteration_across_", variable, sep = ''),
+                     buttons = list(contextButton = list(align = "left",
+                                                         symbolStrokeWidth = 4,
+                                                         symbolSize = 20,
+                                                         symbolStroke = '#4D4D4D',
+                                                         symbol = "menu")))
+```
+
+2.  Enter *Adipose -- Subcutaneous* in the ***Tissue*** **field** and click on *Age* in the ***Alterations associated with*** **field.**
+
+    The progression of the percentage of *Age*-associated altered genes over age is now featured (**Figure** \@ref(fig:LinesigGenesvsAge)).
+    The statistical significance of each proportion is also illustrated with a colour scale.Two periods of major transcriptional changes appear to occur, at late 20's (13.6% altered genes) and late 40's (4.7% altered genes). 
+
+3.  Click on the dot at 29.57 years old (hovering over each point in the plot will show its details).
+    The list of differentially expressed genes, ordered by their significance, appears on the sidebar on the left.
+    Although visually not exatcly the same as in the web app, you can also explore the table below.
+
+```{r LinesigGenesvsAge, fig.align = 'center', fig.cap="Progression of the percentage of Age-associated altered genes over age in Adipose - Subcutaneous. For each age, the list of the most altered genes can be obtained by clicking on the respective dot."}
+variable <- "Age"
+tissue <- "Adipose - Subcutaneous" 
+g <- Line_sigGenesvsAge(tissue, variable, peak)
+
+g %>%
+  hc_exporting(enabled = T,
+               filename = paste("voyAGEr_%genesAltered_across_", variable, "_", tissue, sep = ''),
+               buttons = list(contextButton = list(align = "right",
+                                                   symbolStrokeWidth = 4,
+                                                   symbolSize = 20,
+                                                   symbolStroke = '#4D4D4D',
+                                                   symbol = "menu")))  %>%
+  hc_title(text = "Tissue-specific global age-related gene expression alterations over age", useHTML = T) 
+```
+
+```{r}
+   
+      peakClicked <- "29.57"
+     
+      tmp <- data.frame(gene = as.character(rownames(p())), 
+                        pvalue = round(p()[, match(peakClicked, colnames(p()))], 6))
+      tmp <- tmp[order(tmp$pvalue),]
+      rownames(tmp) <- 1:nrow(tmp)
+ 
+      tmp$Info <- paste(paste0("<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", tmp$gene,"' target='_blank'>", "GeneCards", "</a>"),
+                             paste0("<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", tmp$gene,"' target='_blank'>", "NCBI", "</a>"), sep = ", ")
+      filename <- paste("DEG_across_", variable, "_", tissue, "_", peakClicked, "yo", sep = "")
+
+      DT::datatable(tmp,
+                    escape = F,
+                    caption = "Significance for gene expression alteration",
+                    selection = "single", #only one row selected at a time
+                    #filter = "top", #can filter the results per column
+                    options = list(deferRender = TRUE, scrollY = 600, scroller = TRUE, scollX = T,
+                                   dom = "Bfti",
+                                   buttons = list(list(extend='copy',
+                                                       filename = filename),
+                                                  list(extend='csv',
+                                                       filename = filename),
+                                                  list(extend='excel',
+                                                       filename= filename))),
+                    colnames = c("Gene", "p-value", "Info"),
+                    rownames = T,
+                    extensions = c("Scroller", "Buttons")
+      )
+```
+
+4.  Click on the *LMO3* row in the table.
+
+    Plots of *LMO3* expression and the significance of its alterations over age (like in Figure \@ref(fig:CDKN2Apeaks)) appear.
+
+5.  Browse the expression alterations' significance over age of the most altered genes by selecting them in the table.
+
+    Some (e.g., *PRELID1*, *RUNX1T1*, *FGFRL1)* have their expression significantly modified only in the aforementioned first peak at around 28 years old.
+
+6.  Click on the dot at 46.43 y.o. 
+    and similarly browse the expression alterations' significance of the most differentially expressed genes at this age.
+
+    Some (e.g. *MT-CYB*, *MT-ND4*, *MT-ATP6*, *MT-ND2)* have their expression significantlyaltered only in this second peak.
+
+Different sets of genes may drive the different age periods of major transcriptional changes, which begs assessing if they reflect the activation of distinct biological processes.
+For this purpose, the user can profile the biological functions of the genes underlying each peak of transcriptomic changes byassessing their enrichment in manually curated pathways from the  Reactome database (Croft et al., 2014) or in user-provided gene sets.
+
+7.  Go to the ***Enrichment*** **sub-tab**.
+
+    A heatmap showing the normalised enrichment score (NES) of Reactome pathways (columns) along age (row) is displayed (**Figure** \@ref(fig:Heatmap)).
+    The percentage of altered genes over age can be found on the right side of the heatmap.
+    Reactome pathways are gathered in families of biologicalfunctions, based on shared genes, that can be found at the top of the heatmap.
+
+> Note that, for visualisation ease, only the most significantly associated pathways are featured.
+>
+> The user can click on *Select:* in the ***Pathway*** **field** to examine results for a given Reactome pathway.
+
+```{r Heatmap, fig.align = 'center', fig.cap="Heatmap of significance of tissue-specific Age-associated global gene expression alterations over age."}
+
+variable <- "Age"
+tissue <- "Adipose - Subcutaneous" 
+      pathway <- "All pathways"
+      #Call to the databse
+      modifiedTissuename <- gsub("-", "_", tissue)
+      modifiedTissuename <- gsub(" ", "", modifiedTissuename)
+      modifiedTissuename <- gsub("\\(", "", modifiedTissuename)
+      modifiedTissuename <- gsub("\\)", "", modifiedTissuename)
+      enrich <- readRDS(paste("data/DB_PeakEnrichment.db/",
+                              modifiedTissuename, ".RDS", sep = ""))
+      SigPeak <- peak[peak$tissue == tissue & peak$variable == variable, ]
+  
+        pathway <- TRUE
+
+      g <- Heatmap_NESAgevsPathway(peak = peak, tissue = tissue, variable = variable, enrichment = enrich, Cluster_Reactome = Cluster_Reactome, ALL = pathway)
+
+      g
+      
+      
+  
+```
+
+8.  Below the heatmap, click on the red family (family 3) in the ***Families of pathways*** **section**.
+
+    A word cloud provides a glimpse into the family's biological functions.
+
+    By clicking on the ***Pathways*** **sub-tab** in the ***Families of pathways*** **section,** the user hasaccess to the list of specific pathways from the Reactome, Gene Ontology (Gene OntologyConsortium, 2004) and KEGG (Kanehisa, 2000) databases that are associated with the family.
+
+```{r}
+ 
+      modifiedTissuename <- gsub("-", "_", tissue)
+      modifiedTissuename <- gsub(" ", "", modifiedTissuename)
+      modifiedTissuename <- gsub("\\(", "", modifiedTissuename)
+      modifiedTissuename <- gsub("\\)", "", modifiedTissuename)
+     
+      enrich <- readRDS(paste("data/DB_PeakEnrichment.db/",
+                              modifiedTissuename, ".RDS", sep = ""))
+
+      SigPeak <- peak[peak$tissue == tissue & peak$variable == variable, ]
+      
+      wordcloud_family(Cluster_Reactome_affiliation, family = "3") %>%
+        hc_exporting(enabled = T,
+                     filename = paste("voyAGEr_WordCloud_family-", "3", sep = ''),
+                     buttons = list(contextButton = list(align = "left",
+                                                         symbolStrokeWidth = 4,
+                                                         symbolSize = 20,
+                                                         symbolStroke = '#4D4D4D',
+                                                         symbol = "menu")))
+```
+
+9.  Click on *User-specified* in the ***Geneset*** **field** on the left.
+
+    Let's examine the enrichment of the three peaks of transcriptional changes in senescent-associated genes.
+
+10. Enter the 230 senescent-associated genes (retrieved from Senequest (Gorgoulis et al., 2019) whose link with senescence is supported by at least 4 sources) from this document's appendixin the ***List of genes*** **field**, leave a Significance  threshold p-value of 0.05 and **Run**.
+
+    Although we have two peaks, if you hover over the tip you'll notice neither of them are significantly enriched in senescence-associated genes (**Figure** \@ref(fig:sengeneset)).
+
+    > Gene symbols can be in upper or lower case but must still follow the HGNC naming.
+    > If a gene symbol is notrecognised as such, the gene is not included in the analysis.
+
+```{r}
+sengeneset <- as.vector(fread("www/senescenceGeneSet.txt", header = F)$V1)
+```
+
+```{r sengeneset, fig.align = 'center', fig.cap="Enrichment of altered genes amongst senescent-associated genes    over age (non significant)."}
+ 
+      threshold <- 0.05    
+      Line_FishertestEnrichmentManualvsAge(p(), sengeneset, threshold = threshold) %>%
+        hc_exporting(enabled = T,
+                     filename = paste("voyAGEr_genesetEnrichment_", tissue, "_across_", variable , sep = ''),
+                     buttons = list(contextButton = list(align = "left",
+                                                         symbolStrokeWidth = 4,
+                                                         symbolSize = 20,
+                                                         symbolStroke = '#4D4D4D',
+                                                         symbol = "menu")))
+```
+
+```{r}
+      #  tissue <- "Adipose - Subcutaneous"
+      # gene <- selectedGene() 
+      # pvalueData <- p()
+      # coloredBy <- input$variable_model_2
+      # geneInfo <- geneList$info[match(gene, geneList$gene)]
+      # 
+      # variable <- input$variable_model_2
+      # variable <- ifelse(variable == "Age", "Age", ifelse(variable == "Gender", "Sex", "Age&Sex")) #change name for download filename
+      # statsAllAges <- Sig_Mag_Gene_perTissueVariable()[Sig_Mag_Gene_perTissueVariable()$gene==gene,]
+      # 
+      # g <- Line_pvaluevsAge(gene = gene, pvalueData = pvalueData, geneData = geneData_Tissue(), allAges = statsAllAges, tissue = tissue, coloredBy = coloredBy) %>%
+      #   hc_title(text = gene) #%>%
+      #   #hc_subtitle(text = geneInfo)
+      # g %>%
+      #   hc_exporting(enabled = T,
+      #                filename = paste("voyAGEr_Alteration_across_", variable, "_", gene, "_", tissue, sep = ''),
+      #                buttons = list(contextButton = list(align = "left",
+      #                                                    symbolStrokeWidth = 4,
+      #                                                    symbolSize = 20,
+      #                                                    symbolStroke = '#4D4D4D',
+      #                                                    symbol = "menu")))
+```
+
+# Modules of co-expressed genes
+
+Genes with highly correlated expression are likely to be coregulated and share biological functions or associations with phenotypical or pathological traits (van Dam et al., 2017). 
+Clusters of these genes, called modules, are identified in 4 tissues using voyAGEr and their enrichment in cell types, Reactome pathways, and disease markers can be analysed.
+
+1.  Go to the ***Results*** **sub-section** of the ***Module*** **section.**
+
+    > The ***About*** **sub-section** graphically summarises the methods employed to obtain the modules.
+
+    Each module is made of a set of genes and characterised by an eigengene representing their averageexpression profile.
+
+    Modules' eigengene expression and enrichment in Reactome pathways, cell types, and diseasemarkers can be respectively found in the 4 sub-tabs: `Expression`,`Cell types`, `Pathways`, `Diseases`.
+
+2.  Choose *Brain - Cortex* in the ***Tissue*** **field**.
+
+    8 modules were identified in this tissue. 
+    Each module is named based on the colour used to depict it.
+
+    In the `Expression` tab, the user can explore the scaled expression of the eigengene of each module **(Figure** \@ref(fig:modulesBrain)**).**
+
+```{r modulesBrain, fig.align = 'center', fig.cap="Heatmap of module-specific eigengene expression over age."}
+ tissue <- "Brain - Cortex"
+      moduleExpression <- moduleInfo$moduleExpression[moduleInfo$moduleExpression$tissue == tissue, ]
+      Heatmap_LoessMEvsAge(moduleExpression)
+```
+
+3.  Go to the ***Cell types*** **sub-tab.**
+
+    > For each tissue, cell types and their markers were retrieved from the literature and then differ from a paper to another.
+    > Regarding the Brain - Cortex analysis, we can see that the annotation of cell types from Fan (Fan et al., 2018) is more comprehensive than Descartes (Cao et al., 2020). 
+
+    Select the Descartes signature.
+    At least four of the 5 modules appear to be particularlyenriched for certain cell types markers (**Figure** \@ref(fig:enrichmentCellTypesBrain)): the yellow module for Microglia, turquoise for Endothelial cells, brown for oligodendrocytes, and blue for astrocytes.
+
+```{r enrichmentCellTypesBrain, fig.align = 'center', fig.cap="Enrichment of modules of co-expressed genes identified the brain cortex in cell types markers from Cao et al. (2020)"}
+ 
+selectedReference <- "Descartes"
+      moduleCellType <- moduleInfo$fisherTest_cellComposition[moduleInfo$fisherTest_cellComposition$tissue == tissue, ]
+      moduleCellType <- moduleCellType[moduleCellType$reference == selectedReference,]
+    
+      Heatmap_FisherTest_cellComposition(moduleCellType) %>%
+        hc_title(text = paste0("Cell types markers from ", selectedReference)) %>%
+        hc_exporting(enabled = T,
+                     filename = paste("voyAGEr_module_", tissue, "_cellType", sep = ''),
+                     buttons = list(contextButton = list(align = "right",
+                                                         symbolStrokeWidth = 4,
+                                                         symbolSize = 20,
+                                                         symbolStroke = '#4D4D4D',
+                                                         symbol = "menu")))
+```
+
+4.  Choose *MEblue* in the ***Module*** **field**.
+
+    The four layers of information captured in the four Module sub-tabs are now specifically displayed for the chosen module.
+    Besides, the module's 241 genes are identified on the left.
+    The expression of the module's eigengene appears to increase with age (**Figure** \@ref(fig:modulevsAge)).
+
+```{r modulevsAge, fig.align = 'center', fig.cap="Blue module (associated with astrocytes) eigengene expression in the brain cortex over age."}
+module <- "MEblue"
+coloredBy <- "none"
+moduleShapedBy <- "none"
+moduleCondition <- "none"
+condition <- ifelse(identical(as.character(moduleShapedBy) == "Condition" & !is.na(moduleCondition), logical(0)) | as.character(moduleShapedBy) == "none", "none", as.character(moduleCondition))
+moduleExpression <- moduleInfo$moduleExpression[moduleInfo$moduleExpression$tissue == tissue, ]
+
+Scatter_MEvsAge(MEexpressionData = moduleExpression, module = module, colored = coloredBy, shaped = condition,
+                donorCondition = donorCondition, technicalCondition = technicalCondition) %>%
+  hc_exporting(enabled = T,
+               filename = paste("voyAGEr_Profile_", module, "_", tissue, sep = ''),
+               buttons = list(contextButton = list(align = "right",
+                                                   symbolStrokeWidth = 4,
+                                                   symbolSize = 20,
+                                                   symbolStroke = '#4D4D4D',
+                                                   symbol = "menu")))
+```
+
+5.  Click on *Sex* in the ***Colored by*** **field**.
+
+    The module's eigengene expression suggests differences between sexes throughout age (**Figure** \@ref(fig:modulevsAgeSex)).
+    However, the number of Female samples is decreased in young ages when compared to Male samples, and as such these results should be interpreted with a grain of salt.
+
+```{r modulevsAgeSex, fig.align = 'center', fig.cap="Blue module eigengene expression in the brain cortex, discriminated between sexes, over age."}
+module <- "MEblue"
+coloredBy <- "Sex"
+moduleShapedBy <- "none"
+moduleCondition <- "none"
+condition <- ifelse(identical(as.character(moduleShapedBy) == "Condition" & !is.na(moduleCondition), logical(0)) | as.character(moduleShapedBy) == "none", "none", as.character(moduleCondition))
+moduleExpression <- moduleInfo$moduleExpression[moduleInfo$moduleExpression$tissue == tissue, ]
+
+Scatter_MEvsAge(MEexpressionData = moduleExpression, module = module, colored = coloredBy, shaped = condition,
+                donorCondition = donorCondition, technicalCondition = technicalCondition) %>%
+  hc_exporting(enabled = T,
+               filename = paste("voyAGEr_Profile_", module, "_", tissue, sep = ''),
+               buttons = list(contextButton = list(align = "right",
+                                                   symbolStrokeWidth = 4,
+                                                   symbolSize = 20,
+                                                   symbolStroke = '#4D4D4D',
+                                                   symbol = "menu")))
+```
+
+6.  Click on *All* in the ***Colored by*** fieldand on *Condition* in the ***Shaped by*** field**.** Choose *Cerebrovascular Disease* as condition. Eigengene expression appears to be slightly different between conditions, suggesting a role of astrocytes in these conditions (**Figure** \@ref(fig:modulevsAgeCondition)). However, the number of Positive samples is diminished, and as such these results should be taken with a grain of salt.
+
+```{r modulevsAgeCondition, fig.align = 'center', fig.cap="Blue module eigengene expression in the brain cortex, discriminated by the donors’ “Cerebrovascular Disease” history, over age."}
+module <- "MEblue"
+coloredBy <- "none" 
+moduleCondition <- "none"
+condition <-"Cerebrovascular Disease (stroke, TIA, embolism, aneurysm, other circulatory disorder affecting the brain)"
+moduleExpression <- moduleInfo$moduleExpression[moduleInfo$moduleExpression$tissue == tissue, ]
+
+Scatter_MEvsAge(MEexpressionData = moduleExpression, module = module, colored = coloredBy, shaped = condition,
+                donorCondition = donorCondition, technicalCondition = technicalCondition) %>%
+  hc_exporting(enabled = T,
+               filename = paste("voyAGEr_Profile_", module, "_", tissue, sep = ''),
+               buttons = list(contextButton = list(align = "right",
+                                                   symbolStrokeWidth = 4,
+                                                   symbolSize = 20,
+                                                   symbolStroke = '#4D4D4D',
+                                                   symbol = "menu")))
+```
+
+7.  Explore the ***Pathways*** and the ***Diseases-DisGeNET*** **sub-tabs**, and browse through the significant results. These results might suggest a role of astrocytes in their enrichment with age.
+
+\
+\
