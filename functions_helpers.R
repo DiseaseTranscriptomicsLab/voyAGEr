@@ -84,14 +84,14 @@ Line_sigGenesvsAge <- function(tissue, variable, peak)
   return(g)
 }
 
-Line_pvaluevsAge <- function(gene, pvalueData, geneData, allAges, tissue, coloredBy)
+Line_pvaluevsAge <- function(gene, pvalueData, geneData, allAges, abline, tissue, coloredBy)
 {
   #GE info
   GE <- geneData
   GE <- GE[GE$tissue == tissue,] 
   GE$jittered_age <- jitter_ages(GE$age)
-  statsAllAges_text <- paste0("Overall changes: p-value = ", round(allAges$pvalue,4), " | t-statistic = ", round(allAges$tvalue,2))
-  
+  #statsAllAges_text <- paste0("Overall changes: p-value = ", round(allAges$pvalue,4), " | t-statistic = ", round(allAges$tvalue,2))
+  statsAllAges_text <- paste0("Overall changes: p-value = ", round(allAges$pvalue,4), " | t-statistic = ", round(allAges$tvalue,2), " | logFC/year = ", round(abline$a,4))
    
   if (coloredBy == "Age")
   {
@@ -170,8 +170,8 @@ Line_pvaluevsAge <- function(gene, pvalueData, geneData, allAges, tissue, colore
     
   }
   
-  g <- g %>% 
-    hc_subtitle(text = statsAllAges_text) 
+  g <- g%>% 
+    hc_subtitle(text = statsAllAges_text, style = list(color = "black") ) 
   
   return(g)
 }
@@ -1592,20 +1592,28 @@ Line_FishertestEnrichmentManualvsAge <- function(p, gene, threshold)
   
 }
 
-Line_signficanceAlterationsvsAge <- function(gene, pvalueData, geneData, allAges, tissue, coloredBy)
+Line_signficanceAlterationsvsAge <- function(gene, pvalueData, geneData, allAges, abline, tissue, coloredBy)
 {
+  
+ 
+  
   #GE info
   GE <- geneData
   GE <- GE[GE$tissue == tissue,]
   GE$jittered_age <- jitter_ages(GE$age)
-  statsAllAges_text <- paste0("Overall changes: p-value = ", round(allAges$pvalue,4), " | t-statistic = ", round(allAges$tvalue,2))
+  statsAllAges_text <- paste0("Overall changes: p-value = ", round(allAges$pvalue,4), " | t-statistic = ", round(allAges$tvalue,2), " | logFC/year = ", round(abline$a,4))
     
     
+  # fit_abline <- data.frame(x=seq(20,70,0.1),
+  #                          y=abline$a * seq(20,70,0.1) + abline$b)
+ 
   if (coloredBy == "Age")
   {
     
     fit <- loess(expression ~ age, data = GE)
     fit <- plyr::arrange(generics::augment(fit), age)
+    
+
     
     #Pvalue info
     tmp <- melt(as.matrix(pvalueData))
@@ -1627,7 +1635,7 @@ Line_signficanceAlterationsvsAge <- function(gene, pvalueData, geneData, allAges
              labels = list(style = list(color = "yellowgreen")))
       ) %>% 
       hc_add_series(data = list_parse2(GE[, c("jittered_age", "expression")]), type = "scatter", showInLegend = FALSE,
-                    yAxis = 1, color = "yellowgreen", marker = list(radius = 4, symbol = "round")) %>% 
+                    yAxis = 1, color = "yellowgreen", marker = list(radius = 4, symbol = "round"))   %>% 
       # hc_add_series(data = list_parse2(data.frame(fit$age, fit$.fitted - 2*fit$.se.fit, fit$.fitted + 2*fit$.se.fit)), yAxis = 1,
       #               type = "arearange", showInLegend = FALSE, color = "lightgrey") %>%
       hc_add_series(data = list_parse2(data.frame(fit$age, fit$.fitted)), yAxis = 1, lineWidth = 5,
@@ -1690,8 +1698,9 @@ Line_signficanceAlterationsvsAge <- function(gene, pvalueData, geneData, allAges
     
   }
   
+  #add overall info
   g <- g  %>% 
-    hc_subtitle(text = statsAllAges_text) 
+    hc_subtitle(text = statsAllAges_text, style = list(color = "black") ) 
   
   return(g)
 }
