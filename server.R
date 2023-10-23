@@ -562,7 +562,7 @@ shinyServer(
       validate(need(!is.null(pvalueData), "No possible analysis for this alteration in this tissue"))
 
       variable <- ifelse(variable == "Age", "Age", ifelse(variable == "Gender", "Sex", "Age&Sex")) #change name for download filename
-      g <- Line_signficanceAlterationsvsAge(gene, pvalueData, geneData = geneData(), allAges = statsAllAges, abline=ablineAllAges, tissue, coloredBy =  variable) %>%
+      g <- Line_signficanceAlterationsvsAge(gene, pvalueData, geneData = geneData(), allAges = statsAllAges, abline=ablineAllAges, tissue=tissue, coloredBy =  variable) %>%
         hc_title(text = title, useHTML = T) %>%
         hc_exporting(enabled = T,
                      filename = paste("voyAGEr_Alteration_", gene, "_across_", variable, "_", tissue, sep = ''),

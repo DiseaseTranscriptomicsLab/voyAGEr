@@ -94,6 +94,31 @@ Sig_Mag_Gene_perTissueVariable <- function(){
     }
     
 
+fit_abline <- function(){
+     
+      modifiedTissuename <- gsub("-", "_", tissue)
+      modifiedTissuename <- gsub(" ", "", modifiedTissuename)
+      modifiedTissuename <- gsub("\\(", "", modifiedTissuename)
+      modifiedTissuename <- gsub("\\)", "", modifiedTissuename)
+      
+      if (tissue %in% c("Ovary", "Uterus", "Vagina", "Prostate", "Fallopian Tube", "Testis") & variable %in% c("Gender", "Int_Age_Gender"))
+      {
+        result <- NULL
+      } else
+      {
+        
+        #RDS files online
+        result <- readRDS(paste("data/DB_pvalue_ShARP-LM_EntireAgeRange_abline/",
+                                modifiedTissuename, "_", variable, ".RDS",
+                                sep = ""))
+        #result <- result[result$gene == gene,]
+        result <- result[, -c(4)]
+      }
+      result
+    }
+
+
+
     geneData <- function(){ 
       gene <- gsub("-", "_", gene) # '-' creates issues when calling database so '-' were replaced by "_" in the database's names 
       #RDS files online
@@ -332,28 +357,29 @@ p <- function(){
 ```{r CDKN2Apeaks, fig.align = 'center', fig.cap="CDKN2A expression in the lung (top panel) and significance of its alterations (bottom panel) over age."}
 
 tissue <- "Lung"
-      pvalueData <- p_Alteration_gene()
-      statsAllAges <- Sig_Mag_Gene_perTissueVariable()[Sig_Mag_Gene_perTissueVariable()$gene==gene,] 
-      title <- paste(gene, " ",
-                     "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'>NCBI</a>",
-                     " | ",
-                     "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'>GeneCards</a>",
-                     sep = "")
- 
+pvalueData <- p_Alteration_gene()
+statsAllAges <- Sig_Mag_Gene_perTissueVariable()[Sig_Mag_Gene_perTissueVariable()$gene==gene,] 
+ablineAllAges <- fit_abline()[fit_abline()$gene==gene,]
+title <- paste(gene, " ",
+               "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'>NCBI</a>",
+               " | ",
+               "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'>GeneCards</a>",
+               sep = "")
 
-      variable <- ifelse(variable == "Age", "Age", ifelse(variable == "Gender", "Sex", "Age&Sex")) #change name for download filename
-      
-      g <- Line_signficanceAlterationsvsAge(gene, pvalueData, geneData = geneData(), allAges = statsAllAges, tissue, coloredBy =  variable) %>%
-        hc_title(text = title, useHTML = T) %>%
-        hc_exporting(enabled = T,
-                     filename = paste("voyAGEr_Alteration_", gene, "_across_", variable, "_", tissue, sep = ''),
-                     buttons = list(contextButton = list(align = "left",
-                                                         symbolStrokeWidth = 4,
-                                                         symbolSize = 20,
-                                                         symbolStroke = '#4D4D4D',
-                                                         symbol = "menu")))
-      
-      g
+
+variable <- ifelse(variable == "Age", "Age", ifelse(variable == "Gender", "Sex", "Age&Sex")) #change name for download filename
+
+g <- Line_signficanceAlterationsvsAge(gene, pvalueData, geneData = geneData(), allAges = statsAllAges, abline=ablineAllAges,tissue, coloredBy =  variable) %>%
+  hc_title(text = title, useHTML = T) %>%
+  hc_exporting(enabled = T,
+               filename = paste("voyAGEr_Alteration_", gene, "_across_", variable, "_", tissue, sep = ''),
+               buttons = list(contextButton = list(align = "left",
+                                                   symbolStrokeWidth = 4,
+                                                   symbolSize = 20,
+                                                   symbolStroke = '#4D4D4D',
+                                                   symbol = "menu")))
+
+g
 ```
 
 6.  Go to the ***Profile*** **sub-tab**. voyAGEr can also associate *CDKN2A* expression in the lung with the donors' sex and medical history. These clinical data are displayed in a table below  theexpression profile's scatter plot.
@@ -387,6 +413,7 @@ tissue <- "Lung"
       
 
       pvalueData <- p_Alteration_gene()
+      ablineAllAges <- fit_abline()[fit_abline()$gene==gene,]
       statsAllAges <- Sig_Mag_Gene_perTissueVariable()[Sig_Mag_Gene_perTissueVariable()$gene==gene,] 
       title <- paste(gene, " ",
                      "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'>NCBI</a>",
@@ -397,7 +424,7 @@ tissue <- "Lung"
 
 
       
-      g <- Line_signficanceAlterationsvsAge(gene, pvalueData, geneData = geneData(), allAges = statsAllAges, tissue, coloredBy =  variable) %>%
+      g <- Line_signficanceAlterationsvsAge(gene, pvalueData, geneData = geneData(), allAges = statsAllAges, abline=ablineAllAges, tissue, coloredBy =  variable) %>%
         hc_title(text = title, useHTML = T) %>%
         hc_exporting(enabled = T,
                      filename = paste("voyAGEr_Alteration_", gene, "_across_", variable, "_", tissue, sep = ''),
