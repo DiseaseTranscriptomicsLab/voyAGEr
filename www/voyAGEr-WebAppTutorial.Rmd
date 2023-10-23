@@ -797,8 +797,7 @@ Croft, D., Mundo, A. F., Haw, R., Milacic, M., Weiser, J., Wu, G., Caudy, M., Ga
 TheReactome pathway knowledgebase. 
 *Nucleic Acids Research*, *42*(D1), D472--D477.<https://doi.org/10.1093/nar/gkt1102>
 
-Cao, J., O'Day, D. R., Pliner, H. A., Kingsley, P. D., Deng, M., Daza, R. M., ...
-& Shendure, J.
+Cao, J., O'Day, D. R., Pliner, H. A., Kingsley, P. D., Deng, M., Daza, R. M., ... & Shendure, J.
 (2020).
 A human cell atlas of fetal gene expression.
 Science, 370(6518), eaba7721. 
@@ -815,8 +814,7 @@ Involvement of the Ink4 proteins p16 and p15 in T-lymphocyte senescence. 
 *Oncogene*, *17*(5),595--602.
 <https://doi.org/10.1038/sj.onc.1201965>
 
-Fan, X., Dong, J., Zhong, S., Wei, Y., Wu, Q., Yan, L., ...
-& Tang, F.
+Fan, X., Dong, J., Zhong, S., Wei, Y., Wu, Q., Yan, L., ... & Tang, F.
 (2018).
 Spatial transcriptomic survey of human embryonic cerebral cortex by single-cell RNA-seq analysis.
 Cell research, 28(7), 730-745. 
