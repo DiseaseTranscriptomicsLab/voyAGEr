@@ -632,7 +632,7 @@ Heatmap_LoessGEvsAge <- function(data)
   b <- dcast(b, tissue~age, value.var = "expression")
   rownames(b) <- b$tissue
   b <- b[,-1]
-  b <- t(scale(t(b), scale = F))
+  b <- t(scale(t(b), scale = T))
   i <- (hclust(dist(b)))
   
   b <- b[i$order, ]
@@ -975,7 +975,7 @@ Heatmap_LoessMEvsAge <- function(age)
     fit <- loess(value~age, data = age[age$module == i,])
     a <- rbind(a, 
                #data.frame(expression = scale(predict(fit, seq(20, 70, 0.5)), scale = F),
-               data.frame(expression = scale(predict(fit, seq(20, 70, 0.5)), scale = ),
+               data.frame(expression = scale(predict(fit, seq(20, 70, 0.5)), scale = T),
                           age = seq(20, 70, 0.5),
                           module = i))
   }
