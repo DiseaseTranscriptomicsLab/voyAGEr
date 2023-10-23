@@ -128,6 +128,7 @@ shinyUI(fluidPage(
                                                        conditionalPanel(condition = "input.tissue != 'All tissues' && input.tissue != ''", 
                                                                         column(width = 12,
                                                                                tags$h4(""),
+                                                                               HTML("For data privacy purposes, a light randomization was attributed to each scattered point along the age axis. The plotted regression line (black) was fitted using the original values."),
                                                                                withSpinner(highchartOutput("scatterGEvsAge", height = "650px"), 
                                                                                            color = "#2C3E50", type = 5, size = 0.5),
                                                                                #downloadButton('downloadDataGeneExpression', 'Table'),
@@ -158,6 +159,7 @@ shinyUI(fluidPage(
                                                                                conditionalPanel(condition = "input.variable_Gene_Alteration == 'Int_Age_Gender'",
                                                                                                 HTML("The sex-specific gene expression progression over age (top panel) is seen in parallel with the significance of the difference in age associated change of expression between sexes (bottom panel)."),
                                                                                ),
+                                                                               HTML("For data privacy purposes, a light randomization was attributed to each scattered point along the age axis. The plotted regression line (black) was fitted using the original values."),
                                                                                withSpinner(highchartOutput("Line_signficanceAlterationsvsAge", height = "650"), 
                                                                                            color = "#2C3E50", type = 5, size = 0.5))
                                                        )
@@ -394,6 +396,7 @@ shinyUI(fluidPage(
                                              conditionalPanel(condition = "input.selectedModule != 'All modules' && input.selectedModule != ''", 
                                                               column(width = 12, 
                                                                      tags$h4("Eigengene expression"),
+                                                                     HTML("For data privacy purposes, a light randomization was attributed to each scattered point along the age axis. The plotted regression line (black) was fitted using the original values."),
                                                                      withSpinner(highchartOutput("Scatter_MEvsAge", height = "400px"), color = "#2C3E50", type = 5, size = 0.5)),
                                                               tabsetPanel(id = "module-specific", type = "pills",
                                                                           tabPanel("Cell types",
