@@ -151,15 +151,23 @@ shinyUI(fluidPage(
                                                                                #Description text different for each variable
                                                                                conditionalPanel(condition = "input.variable_Gene_Alteration == 'Age'",
                                                                                                 HTML("The gene expression progression over age (top panel) is seen in parallel with its expression alteration's significance (bottom panel).
-                                                                                                     <br> The overall p-value, t-statistic and logFC/year was computed using the entire age range."),
-                                                                               ),
+                                                                                                     <br> For data privacy purposes, a light randomization was attributed to each scattered point along the age axis. The plotted regression line (black) was fitted using the original values.
+                                                                                                     <br> The overall p-value, t-statistic and logFC/year (in orange) was computed using the ShARP-LM model over the entire age range.
+                                                                                                     "),
+                                                                                                ),
                                                                                conditionalPanel(condition = "input.variable_Gene_Alteration == 'Gender'",
-                                                                                                HTML("The sex-specific gene expression progression over age (top panel) is seen in parallel with the significance of the difference in expression between sexes (bottom panel)."),
-                                                                               ),
+                                                                                                HTML("The sex-specific gene expression progression over age (top panel) is seen in parallel with the significance of the difference in expression between sexes (bottom panel).
+                                                                                                     <br> For data privacy purposes, a light randomization was attributed to each scattered point along the age axis. The plotted regression lines were fitted using the original values.
+                                                                                                     <br> The overall p-value, t-statistic and logFC (pink and blue large dots, for females and males, respectively) for the average age was computed using the ShARP-LM model over the entire age range.
+                                                                                                     "),
+                                                                                                ),
                                                                                conditionalPanel(condition = "input.variable_Gene_Alteration == 'Int_Age_Gender'",
-                                                                                                HTML("The sex-specific gene expression progression over age (top panel) is seen in parallel with the significance of the difference in age associated change of expression between sexes (bottom panel)."),
-                                                                               ),
-                                                                               HTML("For data privacy purposes, a light randomization was attributed to each scattered point along the age axis. The plotted regression line (black) was fitted using the original values."),
+                                                                                                HTML("The sex-specific gene expression progression over age (top panel) is seen in parallel with the significance of the difference in age associated change of expression between sexes (bottom panel).
+                                                                                                      <br> For data privacy purposes, a light randomization was attributed to each scattered point along the age axis. The plotted regression lines were fitted using the original values.
+                                                                                                      <br> The overall p-value, t-statistic and logFC/year was computed using the ShARP-LM model over the entire age range.
+                                                                                                    "),
+                                                                                                ),
+                                                                               
                                                                                withSpinner(highchartOutput("Line_signficanceAlterationsvsAge", height = "650"), 
                                                                                            color = "#2C3E50", type = 5, size = 0.5))
                                                        )
