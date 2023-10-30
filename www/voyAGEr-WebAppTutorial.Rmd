@@ -132,11 +132,11 @@ fit_abline <- function(){
 
 voyAGEr is freely available at [[https://compbio.imm.medicina.ulisboa.pt/voyAGEr]{.ul}](https://compbio.imm.medicina.ulisboa.pt/voyAGEr)
 
-voyAGEr is composed of four main sections (the tabs in the navigation bar at the top):
+voyAGEr is composed of four main sections (the tabs in the navigation bar at the top):
 
--   **`Home`** (depicted by the home icon  and no literal titling): to visually explain the used  methodand its associated findings featured in the application.
+-   **`Home`** (depicted by the home icon): to visually explain the used method and its associated findings featured in the application.
 
--   **`Gene`**: to lead a gene-centric investigation, namely to assess how the expression of a specificgene changes with age and sex in a specific tissue.
+-   **`Gene`**: to lead a gene-centric investigation, namely to assess how the expression of a specific gene changes with age and sex in a specific tissue.
 
 -   **`Tissue`**: to analyse how tissue-specific transcriptomes change with age and sex.
 
@@ -146,21 +146,21 @@ voyAGEr leverages RNA-seq datasets from the GTEx project (Lonsdale et 
 
 # Case-study 1: Senescence-associated genes
 
-Cellular senescence is a stress-induced cell cycle arrest limiting proliferation of potentially oncogenic cells but progressively creating an inflammatory environment in tissues as they age and therefore an example of a process whose molecular mechanisms are of particular interest to ageing researchers (Gorgoulis et al., 2019; Van Deursen, 2014).
+Cellular senescence is a stress-induced cell cycle arrest limiting proliferation of potentially oncogenic cells but progressively creating an inflammatory environment in tissues as they age and therefore an example of a process whose molecular mechanisms are of particular interest to ageingresearchers (Gorgoulis et al., 2019; Van Deursen, 2014).
 
-Senescence markers, such as *CDKN2A*, encoding cell cycle regulatory protein p16INK4A thataccumulates in senescent cells (Erickson et al., 1998; Gil & Peters, 2006), can thus be studied as putative markers of ageing of certain tissues.
+Senescence markers, such as *CDKN2A*, encoding cell cycle regulatory protein p16INK4A that accumulates in senescent cells (Erickson et al., 1998; Gil & Peters, 2006), can thus be studied as putative markers of ageing of certain tissues.
 
-To examine CDKN2A expression changes across age:
+To examine *CDKN2A* expression changes across age:
 
-1.  Go to the **Gene section**
+1.  Go to the **Gene section**
 
-2.  Type **CDKN2A** in the **Gene field**
+2.  Type **CDKN2A** in the **Gene field**
 
 > Note that gene names in voyAGEr are HGNC (HUGO Gene Nomenclature Committee) symbols.
-> For each gene, the respective NCBI and GeneCards webpages can be accessed by clicking on their logos next to its name on plot's title.
+> For each gene, the respective NCBI and GeneCards webpages can be accessed by clicking on their names next to its HGNC symbol on the plot's title.
 
-3.  In the **Profile sub-tab**, the user can explore a heatmap of tissue-specific CDKN2A scaled expression (Z-scores) across age, for all tissues (Figure \@ref(fig:CDKN2Aheatmap)).
-4.  In the **Alteration sub-tab**, the user can explore a heatmap of significance of tissue-specific CDKN2A expression age-related alterations due to Age, Sex or Age&Sex (depending on the user's choice -- **Alterations associated with field** on the left), for all tissues. By choosing All tissues and Age in the ***Tissue*** and ***Alterations associated with*** **fields**, respectively, a heatmap like that of **Figure** \@ref(fig:CDKN2Aheatmasigp) is featured.
+3.  In the **Profile sub-tab**, the user can explore a heatmap of tissue-specific *CDKN2A* scaled expression (Z-scores) across age, for all tissues (Figure \@ref(fig:CDKN2Aheatmap)).
+4.  In the **Alteration sub-tab**, the user can explore a heatmap of significance of tissue-specific *CDKN2A* expression age-related alterations due to Age, Sex or Age&Sex (depending on the user's choice -- **Alterations associated with field** on the left), for all tissues. By choosing "All tissues" and "Age" in the "***Tissue"*** and "***Alterations associated with"*** **fields**, respectively, a heatmap like that of **Figure** \@ref(fig:CDKN2Aheatmasigp) is featured.
 
 ```{r include=F}
 
@@ -302,12 +302,13 @@ variable <- "Age"
 
 5.  Enter/select *Lung* in the ***Tissue*** **field** to investigate *CDKN2A* expression changes in that specific tissue.
 
-    Plots of *CDKN2A* expression (top panel,identical to that in the *Profile* sub-tab) and the significance of its alterations over age (bottom panel) are then featured (**Figure** \@ref(fig:CDKN2Apeaks)).
+    Plots of *CDKN2A* expression (top panel, identical to that in the *Profile* sub-tab) and the significance of its alterations over age (bottom panel) are then featured (**Figure** \@ref(fig:CDKN2Apeaks)).
     Significant *CDKN2A* expression changes are observed in around 30 years-old, late forties and mid fifties.
 
-    The user can also check the the overall changes of *CDKN2A* with age, represented as the subtitle of this figure.
-    These are the results of fitting the ShARP-LM model on the entire age range, providing both p-value and t-value.
-    A positive t-value represents an increase of expression with age.
+    The user can also check the overall changes of *CDKN2A* with age, represented as the subtitle of this figure.
+    These are the results of fitting the ShARP-LM model on the entire age range, providing both p-value and t-statistic.
+    A dashed line in orange summarizes these changes.
+    A positive t-statistic represents an increase of expression with age.
 
 ```{r}
 p <- function(){
@@ -382,27 +383,27 @@ g <- Line_signficanceAlterationsvsAge(gene, pvalueData, geneData = geneData(), a
 g
 ```
 
-6.  Go to the ***Profile*** **sub-tab**. voyAGEr can also associate *CDKN2A* expression in the lung with the donors' sex and medical history. These clinical data are displayed in a table below  theexpression profile's scatter plot.
+6.  Go to the ***Profile*** **sub-tab**. voyAGEr can also associate *CDKN2A* expression in the lung with the donors' sex and medical history. These clinical data are displayed in a table below the expression profile's scatter plot.
 
-> GTEx transcriptomic data are from "healthy" tissue samples from donors  that had, nonetheless, reported medical conditions (Lonsdale et al., 2013). 
+> GTEx transcriptomic data are from "healthy" tissue samples from donors that had, nonetheless, reported medical conditions (Lonsdale et al., 2013). 
 >  
 
 7.  Click on *Sex* in the ***Coloured*** **by** field,leaving *All* in the ***Shaped by*** **field.**
 
     *CDKN2A* lung expression progression with age appears to be influenced by the donors' sex, particularly in the mid-thirties (**Figure** \@ref(fig:CDKN2Apeakssex)).
-    This observation can be statistically tested in the ***Alteration*** **sub-tab** by clicking on *Sex* in the ***Alterations associated with*** **field**.
+    The statistics of such observation can be assessed in the ***Alteration*** **sub-tab** by clicking on *Sex* in the ***Alterations associated with*** **field**.
 
-    1.  Back in the *Profile* sub-tab, click on *All* in the ***Coloured*** **by** fieldand on *Condition* inthe ***Shaped by*** field**.** Enter/select *MHCOPD* in the ***Select*** field.
+    1.  Back in the *Profile* sub-tab, click on *All* in the ***Coloured*** **by** field and on *Condition* in the ***Shaped by*** field**.** Enter/select *MHCOPD* in the ***Select*** field.
 
-        The *CDKN2A* lung expression profile is herein associated with medical conditions(positive if the donor suffered from the condition, negative if not and unknown if theassociation is uncharted).
-        Moreover, the median gene expression values for positiveand negative conditions are displayed.
-        The significance of Kruskal-Wallis tests for thedifference in gene expression medians between positive and negative donors is usedto rank conditions.
+        The *CDKN2A* lung expression profile is herein associated with medical conditions (positive if the donor suffered from the condition, negative if not and unknown if the association is uncharted).
+        Moreover, the median gene expression values for positive and negative conditions are displayed.
+        The significance of Kruskal-Wallis tests for the difference in gene expression medians between positive and negative donors is used to rank conditions.
         In this case, the condition selected (Chronic Respiratory Disease) is amongst those displaying a significant difference in median (adjusted p-value below 0.05).
-        On the scatter plot with *CDKN2A* lung expression over age, the curvesfitted independently for positive and negative conditions show that such  difference ingene expression occurs mostly after the age of 50 (**Figure** \@ref(fig:CDKN2ApeaksMHCOPD)).
+        On the scatter plot with *CDKN2A* lung expression over age, the curves fitted independently for positive and negative conditions show that such  differences in gene expression occurs mostly after the age of 55 (**Figure** \@ref(fig:CDKN2ApeaksMHCOPD)).
 
 > **Limitations**: In the GTEx dataset, there are conditions for which very few donors are positive and others for which very few donors have their condition state annotated. 
 > The significance of the Kruskal-Wallis tests must therefore be regarded with caution and as providing limited information. 
-> In this case, for example, even though significant differences in median were found for the Chronic Respiratory Disease, the low number of positive samples and their concentration in limited age ranges hamper any solid conclusion.
+> In this case, for example, even though significant differences in median were found for the Chronic Respiratory Disease, the low number of positive samples and their incidence in limited age ranges hamper any solid conclusion.
 
 ```{r CDKN2Apeakssex, fig.align = 'center', fig.cap="CDNK2A expression in the lung, discriminated between donors sex (female in pink, male in blue) over age."}
 
@@ -469,11 +470,11 @@ g
 
 # Case-study 2: Transcriptional changes in the *Subcutaneous Adipose Tissue*
 
-1.  Go to the ***Tissue*** **section.**
+1.  Go to the ***Tissue*** **section.**
 
-    The landscape of *Age*-, *Sex*-and *Age&Sex*-associated global gene expression alterations along age for all tissues can be profiled using the significance of proportions of differentially expressed genes. 
-    Three periods stand out with significant transcriptional changes associated with *Age* (keeping the default *All tissues* in the ***Tissue*** **field** and *Age* in the ***Alterations associated with*** **field**), after 55 years old (**Figure** \@ref(fig:tissueAlterationsAge)).
-    Moreover, most of the significant transcriptional differences between sexes appear to occur in the fifth and sixth decades of life (*All tissues* in the ***Tissue*** **field** and *Sex* in the ***Alterations associated with*** **field**) (**Figure** \@ref(fig:tissueAlterationsSex)).
+    The landscape of *Age*-, *Sex*- and *Age&Sex*-associated global gene expression alterations along age for all tissues can be profiled using the significance of proportions of altered genes. 
+    Three periods stand out with significant transcriptional changes associated with *Age* (keeping the default "*All tissues"* in the "***Tissue"*** **field** and "*Age"* in the "***Alterations associated with"*** **field**), after 55 years old (**Figure** \@ref(fig:tissueAlterationsAge)).
+    Moreover, most of the significant transcriptional differences between sexes appear to occur in the fifth and sixth decades of life ("*All tissues"* in the "***Tissue*** **field"** and "*Sex"* in the "***Alterations associated with"*** **field**) (**Figure** \@ref(fig:tissueAlterationsSex)).
 
 ```{r tissueAlterationsAge, fig.align = 'center', fig.cap="Heatmap of significance of tissue-specific Age-associated global gene expression alterations over age."}
  variable <- "Age" 
@@ -509,14 +510,14 @@ g
                                                          symbol = "menu")))
 ```
 
-2.  Enter *Adipose -- Subcutaneous* in the ***Tissue*** **field** and click on *Age* in the ***Alterations associated with*** **field.**
+2.  Enter *Adipose -- Subcutaneous* in the "***Tissue"*** **field** and click on "*Age"* in the "***Alterations associated" with*** **field.**
 
     The progression of the percentage of *Age*-associated altered genes over age is now featured (**Figure** \@ref(fig:LinesigGenesvsAge)).
     The statistical significance of each proportion is also illustrated with a colour scale.Two periods of major transcriptional changes appear to occur, at late 20's (13.6% altered genes) and late 40's (4.7% altered genes). 
 
 3.  Click on the dot at 29.57 years old (hovering over each point in the plot will show its details).
-    The list of differentially expressed genes, ordered by their significance, appears on the sidebar on the left.
-    Although visually not exatcly the same as in the web app, you can also explore the table below.
+    The list of altered genes, ordered by their significance, appears on the sidebar on the left.
+    Although visually not exactly the same as in the web app, you can also explore the table below.
 
 ```{r LinesigGenesvsAge, fig.align = 'center', fig.cap="Progression of the percentage of Age-associated altered genes over age in Adipose - Subcutaneous. For each age, the list of the most altered genes can be obtained by clicking on the respective dot."}
 variable <- "Age"
@@ -575,18 +576,18 @@ g %>%
     Some (e.g., *PRELID1*, *RUNX1T1*, *FGFRL1)* have their expression significantly modified only in the aforementioned first peak at around 28 years old.
 
 6.  Click on the dot at 46.43 y.o. 
-    and similarly browse the expression alterations' significance of the most differentially expressed genes at this age.
+    and similarly browse the expression alterations' significance of the most altered genes at this age.
 
-    Some (e.g. *MT-CYB*, *MT-ND4*, *MT-ATP6*, *MT-ND2)* have their expression significantlyaltered only in this second peak.
+    Some (e.g. *MT-CYB*, *MT-ND4*, *MT-ATP6*, *MT-ND2)* have their expression significantly altered only in this second peak.
 
 Different sets of genes may drive the different age periods of major transcriptional changes, which begs assessing if they reflect the activation of distinct biological processes.
-For this purpose, the user can profile the biological functions of the genes underlying each peak of transcriptomic changes byassessing their enrichment in manually curated pathways from the  Reactome database (Croft et al., 2014) or in user-provided gene sets.
+For this purpose, the user can profile the biological functions of the genes underlying each peak of transcriptomic changes by assessing their enrichment in manually curated pathways from the  Reactome database (Croft et al., 2014) or in user-provided gene sets.
 
 7.  Go to the ***Enrichment*** **sub-tab**.
 
     A heatmap showing the normalised enrichment score (NES) of Reactome pathways (columns) along age (row) is displayed (**Figure** \@ref(fig:Heatmap)).
     The percentage of altered genes over age can be found on the right side of the heatmap.
-    Reactome pathways are gathered in families of biologicalfunctions, based on shared genes, that can be found at the top of the heatmap.
+    Reactome pathways are gathered in families of biological functions, based on shared genes, that can be found at the top of the heatmap.
 
 > Note that, for visualisation ease, only the most significantly associated pathways are featured.
 >
@@ -616,11 +617,11 @@ tissue <- "Adipose - Subcutaneous"
   
 ```
 
-8.  Below the heatmap, click on the red family (family 3) in the ***Families of pathways*** **section**.
+8.  Below the heatmap, click on the red family (family 3) in the "***Families of pathways"*** **section**.
 
-    A word cloud provides a glimpse into the family's biological functions.
+    A word cloud shows the most common words on the family's pathway names, providing a general a idea of that family's biological functions.
 
-    By clicking on the ***Pathways*** **sub-tab** in the ***Families of pathways*** **section,** the user hasaccess to the list of specific pathways from the Reactome, Gene Ontology (Gene OntologyConsortium, 2004) and KEGG (Kanehisa, 2000) databases that are associated with the family.
+    By clicking on the "***Pathways"*** **sub-tab** in the "***Families of pathways"*** **section,** the user can access the list of specific pathways from Reactome, Gene Ontology (Gene Ontology Consortium, 2004) and KEGG (Kanehisa, 2000) databases that are associated with that family.
 
 ```{r}
  
@@ -644,16 +645,16 @@ tissue <- "Adipose - Subcutaneous"
                                                          symbol = "menu")))
 ```
 
-9.  Click on *User-specified* in the ***Geneset*** **field** on the left.
+9.  Click on "*User-specified"* in the "***Gene set"*** **field** on the left.
 
-    Let's examine the enrichment of the three peaks of transcriptional changes in senescent-associated genes.
+    Proceeding with the examination of the enrichment of the three peaks of transcriptional changes in senescent-associated genes.
 
-10. Enter the 230 senescent-associated genes (retrieved from Senequest (Gorgoulis et al., 2019) whose link with senescence is supported by at least 4 sources) from this document's appendixin the ***List of genes*** **field**, leave a Significance  threshold p-value of 0.05 and **Run**.
+10. Enter the 230 senescent-associated genes (retrieved from Senequest (Gorgoulis et al., 2019) whose link with senescence is supported by at least 4 sources) from this document's appendix in the "***List of genes"*** **field**, leave a significance threshold p-value of 0.05 and **Run**.
 
-    Although we have two peaks, if you hover over the tip you'll notice neither of them are significantly enriched in senescence-associated genes (**Figure** \@ref(fig:sengeneset)).
+    Although we have two peaks, if you hover over their tip you'll notice neither of them are significantly enriched in senescence-associated genes (**Figure** \@ref(fig:sengeneset)).
 
     > Gene symbols can be in upper or lower case but must still follow the HGNC naming.
-    > If a gene symbol is notrecognised as such, the gene is not included in the analysis.
+    > If a gene symbol is not recognised as such, the gene is not included in the analysis.
 
 ```{r}
 sengeneset <- as.vector(fread("www/senescenceGeneSet.txt", header = F)$V1)
@@ -696,23 +697,23 @@ sengeneset <- as.vector(fread("www/senescenceGeneSet.txt", header = F)$V1)
       #                                                    symbol = "menu")))
 ```
 
-# Modules of co-expressed genes
+# Modules of co-expressed genes
 
-Genes with highly correlated expression are likely to be coregulated and share biological functions or associations with phenotypical or pathological traits (van Dam et al., 2017). 
-Clusters of these genes, called modules, are identified in 4 tissues using voyAGEr and their enrichment in cell types, Reactome pathways, and disease markers can be analysed.
+Genes with similar expression patterns are likely to be co-regulated and share biological functions or associations with phenotypical or pathological traits (van Dam et al., 2017). 
+Clusters of these genes, called modules, are identified in 4 tissues using voyAGEr and their enrichment in cell types, Reactome pathways, and disease markers can be assessed.
 
-1.  Go to the ***Results*** **sub-section** of the ***Module*** **section.**
+1.  Go to the "***Results"*** **sub-section** of the "***Module"*** **section.**
 
-    > The ***About*** **sub-section** graphically summarises the methods employed to obtain the modules.
+    > The "***About"*** **sub-section** graphically summarises the methods employed to obtain the modules.
 
-    Each module is made of a set of genes and characterised by an eigengene representing their averageexpression profile.
+    Each module is comprised of a set of genes and characterised by an eigengene representing their average expression profile.
 
-    Modules' eigengene expression and enrichment in Reactome pathways, cell types, and diseasemarkers can be respectively found in the 4 sub-tabs: `Expression`,`Cell types`, `Pathways`, `Diseases`.
+    Modules' eigengene expression and enrichment in Reactome pathways, cell types, and disease markers can be respectively found in the 4 sub-tabs: `Expression`,`Cell types`, `Pathways`, `Diseases`.
 
-2.  Choose *Brain - Cortex* in the ***Tissue*** **field**.
+2.  Choose "*Brain - Cortex"* in the "***Tissue"*** **field**.
 
     8 modules were identified in this tissue. 
-    Each module is named based on the colour used to depict it.
+    Each module's name is based on the colour used to depict it.
 
     In the `Expression` tab, the user can explore the scaled expression of the eigengene of each module **(Figure** \@ref(fig:modulesBrain)**).**
 
@@ -722,13 +723,14 @@ Clusters of these genes, called modules, are identified in 4 tissues using voyAG
       Heatmap_LoessMEvsAge(moduleExpression)
 ```
 
-3.  Go to the ***Cell types*** **sub-tab.**
+3.  Go to the "***Cell types"*** **sub-tab.**
 
-    > For each tissue, cell types and their markers were retrieved from the literature and then differ from a paper to another.
-    > Regarding the Brain - Cortex analysis, we can see that the annotation of cell types from Fan (Fan et al., 2018) is more comprehensive than Descartes (Cao et al., 2020). 
+    > For each tissue, cell types and their markers were retrieved from the literature.
+    > It is important to note that these might differ from one another.
+    > For example, regarding the Brain - Cortex analysis, we can see that the annotation of cell types from Fan (Fan et al., 2018) is more comprehensive than Descartes (Cao et al., 2020). 
 
     Select the Descartes signature.
-    At least four of the 5 modules appear to be particularlyenriched for certain cell types markers (**Figure** \@ref(fig:enrichmentCellTypesBrain)): the yellow module for Microglia, turquoise for Endothelial cells, brown for oligodendrocytes, and blue for astrocytes.
+    At least seven of the eight modules appear to be particularly enriched for certain cell types markers (**Figure** \@ref(fig:enrichmentCellTypesBrain)): in particular, the green module for microglia, pink for neuronal cells, turquoise for oligodendrocytes, and blue for astrocytes.
 
 ```{r enrichmentCellTypesBrain, fig.align = 'center', fig.cap="Enrichment of modules of co-expressed genes identified the brain cortex in cell types markers from Cao et al. (2020)"}
  
@@ -750,7 +752,7 @@ selectedReference <- "Descartes"
 4.  Choose *MEblue* in the ***Module*** **field**.
 
     The four layers of information captured in the four Module sub-tabs are now specifically displayed for the chosen module.
-    Besides, the module's 241 genes are identified on the left.
+    Additionally, the module's 241 genes are identified on the left.
     The expression of the module's eigengene appears to increase with age (**Figure** \@ref(fig:modulevsAge)).
 
 ```{r modulevsAge, fig.align = 'center', fig.cap="Blue module (associated with astrocytes) eigengene expression in the brain cortex over age."}
@@ -772,10 +774,10 @@ Scatter_MEvsAge(MEexpressionData = moduleExpression, module = module, colored = 
                                                    symbol = "menu")))
 ```
 
-5.  Click on *Sex* in the ***Colored by*** **field**.
+5.  Click on "*Sex"* in the "***Colored by"*** **field**.
 
-    The module's eigengene expression suggests differences between sexes throughout age (**Figure** \@ref(fig:modulevsAgeSex)).
-    However, the number of Female samples is decreased in young ages when compared to Male samples, and as such these results should be interpreted with a grain of salt.
+    The module's eigengene expression suggests differences between sexes throughout ageing (**Figure** \@ref(fig:modulevsAgeSex)).
+    However, the number of Female samples is decreased in younger ages when compared to Male samples, and as such these results should be interpreted with a critical perspective.
 
 ```{r modulevsAgeSex, fig.align = 'center', fig.cap="Blue module eigengene expression in the brain cortex, discriminated between sexes, over age."}
 module <- "MEblue"
@@ -796,7 +798,7 @@ Scatter_MEvsAge(MEexpressionData = moduleExpression, module = module, colored = 
                                                    symbol = "menu")))
 ```
 
-6.  Click on *All* in the ***Colored by*** fieldand on *Condition* in the ***Shaped by*** field**.** Choose *Cerebrovascular Disease* as condition. Eigengene expression appears to be slightly different between conditions, suggesting a role of astrocytes in these conditions (**Figure** \@ref(fig:modulevsAgeCondition)). However, the number of Positive samples is diminished, and as such these results should be taken with a grain of salt.
+6.  Click on "*All"* in the "***Colored by"*** field and on "*Condition"* in the "***Shaped by"*** field**.** Choose "*Cerebrovascular Disease"* as condition. Eigengene expression appears to be slightly different between conditions, suggesting a role of astrocytes in these conditions (**Figure** \@ref(fig:modulevsAgeCondition)). However, the number of Positive samples is diminished, and as such these results should be taken with a degree of skepticism.
 
 ```{r modulevsAgeCondition, fig.align = 'center', fig.cap="Blue module eigengene expression in the brain cortex, discriminated by the donors’ “Cerebrovascular Disease” history, over age."}
 module <- "MEblue"
@@ -816,7 +818,7 @@ Scatter_MEvsAge(MEexpressionData = moduleExpression, module = module, colored = 
                                                    symbol = "menu")))
 ```
 
-7.  Explore the ***Pathways*** and the ***Diseases-DisGeNET*** **sub-tabs**, and browse through the significant results. These results might suggest a role of astrocytes in their enrichment with age.
+7.  Explore the "***Pathways"*** and the "***Diseases-DisGeNET"*** **sub-tabs**, and browse through the significant results. These results might suggest a role of astrocytes in their enrichment with age.
 
 # References
 
