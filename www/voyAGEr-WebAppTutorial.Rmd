@@ -392,13 +392,19 @@ g
     *CDKN2A* lung expression progression with age appears to be influenced by the donors' sex, particularly in the mid-thirties (**Figure** \@ref(fig:CDKN2Apeakssex)).
     The statistics of such observation can be assessed in the "***Alteration***" sub-tab by clicking on "*Sex*" in the "***Alterations associated with***" field.
 
-    1.  Back in the "*Profile*" sub-tab, click on "*All*" in the "***Coloured by***" field and on "*Condition*" in the "***Shaped by***" field. Enter/select "*MHCOPD*" in the "***Select***" field.
+    As described in the previous point, the user can check the overall changes of *CDKN2A* between sexes, represented as the subtitle of this figure.
+    The large dots represent the average gene expression in each sex (female in pink, male in blue) in the average age.
 
-        The *CDKN2A* lung expression profile is herein associated with medical conditions (positive if the donor suffered from the condition, negative if not and unknown if the association is uncharted).
-        Moreover, the median gene expression values for positive and negative conditions are displayed.
-        The significance of Kruskal-Wallis tests for the difference in gene expression medians between positive and negative donors is used to rank conditions.
-        In this case, the condition selected (Chronic Respiratory Disease) is amongst those displaying a significant difference in median (adjusted p-value below 0.05).
-        On the scatter plot with *CDKN2A* lung expression over age, the curves fitted independently for positive and negative conditions show that such differences in gene expression occurs mostly after the age of 55 (**Figure** \@ref(fig:CDKN2ApeaksMHCOPD)).
+    If the user intends to explore how the differences between sexes of age-associated changes in gene expression evolve with age, one can do so by browsing the "Age&*Sex*" option in the "***Alterations associated with***" field.
+
+8.  Back in the "*Profile*" sub-tab, click on "*All*" in the "***Coloured by***" field and on "*Condition*" in the "***Shaped by***" field.
+    Enter/select "*MHCOPD*" in the "***Select***" field.
+
+    The *CDKN2A* lung expression profile is herein associated with medical conditions (positive if the donor suffered from the condition, negative if not and unknown if the association is uncharted).
+    Moreover, the median gene expression values for positive and negative conditions are displayed.
+    The significance of Kruskal-Wallis tests for the difference in gene expression medians between positive and negative donors is used to rank conditions.
+    In this case, the condition selected (Chronic Respiratory Disease) is amongst those displaying a significant difference in median (adjusted p-value below 0.05).
+    On the scatter plot with *CDKN2A* lung expression over age, the curves fitted independently for positive and negative conditions show that such differences in gene expression occurs mostly after the age of 55 (**Figure** \@ref(fig:CDKN2ApeaksMHCOPD)).
 
 > **Limitations**: In the GTEx dataset, there are conditions for which very few donors are positive and others for which very few donors have their condition state annotated.
 > The significance of the Kruskal-Wallis tests must therefore be regarded with caution and as providing limited information.
