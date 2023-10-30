@@ -236,7 +236,7 @@ shinyServer(
       # a <- readRDS(paste("/genedata/home/arthur/Documents/GTEx/shiftingLM_genes/shiny_app/RDS files/DB_GeneExpressionV2/",
       #                    gene, ".RDS", sep = ""))
       #RDS files online
-      a <- readRDS(paste("data/DB_GeneExpressionV2/",
+      a <- readRDS(paste("data/DB_GeneExpression_correctGeneSymbol/",
                          gene, ".RDS", sep = ""))
       a
     })
@@ -605,7 +605,7 @@ shinyServer(
       #                       "PGD", ".RDS", sep = ""))
 
       #RDS files online
-      gene <- readRDS(paste("data/DB_GeneExpressionV2/",
+      gene <- readRDS(paste("data/DB_GeneExpression_correctGeneSymbol/",
                             "PGD", ".RDS", sep = ""))
 
       validate(need(tissue != "" & tissue != "All tissues", ""))
@@ -691,7 +691,7 @@ shinyServer(
       # a <- readRDS(paste("/genedata/home/arthur/Documents/GTEx/shiftingLM_genes/shiny_app/RDS files/DB_GeneExpressionV2/",
       #                    gene, ".RDS", sep = ""))
       #RDS file onlibe
-      a <- readRDS(paste("data/DB_GeneExpressionV2/",
+      a <- readRDS(paste("data/DB_GeneExpression_correctGeneSymbol/",
                          gene, ".RDS", sep = ""))
       a
     })
