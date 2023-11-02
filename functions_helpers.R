@@ -92,9 +92,12 @@ Line_pvaluevsAge <- function(gene, pvalueData, geneData, allAges, abline, tissue
   GE$jittered_age <- jitter_ages(GE$age)
   #statsAllAges_text <- paste0("Overall changes: p-value = ", round(allAges$pvalue,4), " | t-statistic = ", round(allAges$tvalue,2))
   statsAllAges_text <- paste0("Overall changes: p-value = ", round(allAges$pvalue,4), " | t-statistic = ", round(allAges$tvalue,2), " | logFC/year = ", round(abline$a,4))
-   
+ 
   if (coloredBy == "Age")
   {
+    
+    fit_abline <- data.frame(x=seq(20,70,0.1),
+                             y=abline$a * (seq(20,70,0.1) - mean(GE$age))+ abline$b)
     
     fit <- loess(expression ~ age, data = GE)
     fit <- plyr::arrange(generics::augment(fit), age)
@@ -126,10 +129,98 @@ Line_pvaluevsAge <- function(gene, pvalueData, geneData, allAges, abline, tissue
                                 if(this.point.series.name == 'log10p'){ 
                                 return '<b>Age</b>: ' + this.point.x + ' y.o., <br><b>log<sub>10</sub>(p-value)</b>: ' + Highcharts.numberFormat(this.point.y, 2);}
                                 else{return '<b>Age</b>: ' + this.point.x + ' y.o., <br><b>GE</b>: ' + Highcharts.numberFormat(this.point.y, 2) + ' logCPM';}
-                                }"), useHTML = TRUE)
+                                }"), useHTML = TRUE)%>% 
+      hc_add_series(
+        data = list_parse2(data.frame(fit_abline$x, fit_abline$y)),
+        type = "line",
+        showInLegend = FALSE,
+        yAxis = 1,
+        name = "Entire Age Range",
+        color = "#E9724C",  # Set the line color to blue
+        lineWidth = 10,    # Set the line width
+        dashStyle = "dot", # Set the line style to dotted
+        marker = list(radius = 0, symbol = "round")
+      )  %>% 
+      hc_subtitle(text = statsAllAges_text, style = list(color = "#E9724C") ) 
     
-  } else
-  {
+    
+  }  else if (coloredBy == "Gender") {
+    
+    statsAllAges_text <- paste0("Overall changes: p-value = ", round(allAges$pvalue,4), " | t-statistic = ", round(allAges$tvalue,2), " | logFC = ", round(abline$a,4)) #Change the logFC/year to logFC
+    
+    
+    fit_male <- loess(expression ~ age, data = GE[GE$sex == 1,])
+    fit_male <- plyr::arrange(generics::augment(fit_male), age)
+    
+    fit_female <- loess(expression ~ age, data = GE[GE$sex == 2,])
+    fit_female <- plyr::arrange(generics::augment(fit_female), age)
+    
+    #Pvalue info
+    tmp <- melt(as.matrix(pvalueData[rownames(pvalueData) == gene,]))
+    colnames(tmp) <- c("gene", "Age", "p-value")
+    tmp$log10p <- -log10(tmp$`p-value`)
+    
+    
+    x <- mean(GE$age) 
+    
+    stats_male <- data.frame(x=x,
+                             y=abline$a * (1 - mean(GE$sex)) + abline$b)
+    
+    
+    stats_female <- data.frame(x=x,
+                               y=abline$a * (2 - mean(GE$sex)) + abline$b)
+    
+    
+    g <-   highchart() %>% 
+      hc_yAxis_multiples(
+        list(lineWidth = 2, title = list(useHTML = TRUE, text = "log<sub>10</sub>(p-value)", style = list(color = "#9A839A")), lineColor = "#9A839A", labels = list(style = list(color = "#9A839A")), height = "50%",
+             plotLines = list(list(value = 1.3, color = "black", width = 1, dashStyle = "dot", label = list(text = "p = 0.05")),
+                              list(value = 2, color = "black", width = 1, dashStyle = "dot", label = list(text = "p = 0.01")))),
+        list(showLastLabel = FALSE, opposite = TRUE, height = "50%", top = "50%",
+             title = list(text = "GE (logCPM)", style = list(color = "grey")), 
+             lineColor = "grey", lineWidth = 2,
+             labels = list(style = list(color = "grey")))
+      ) %>% 
+      hc_add_series(data = list_parse2(GE[GE$sex == 1, c("jittered_age", "expression")]), type = "scatter", name = "Male",
+                    yAxis = 1, color = "cornflowerblue", marker = list(radius = 4, symbol = "round")) %>% 
+      hc_add_series(data = list_parse2(GE[GE$sex == 2, c("jittered_age", "expression")]), type = "scatter", name = "Female",
+                    yAxis = 1, color = "hotpink", marker = list(radius = 4, symbol = "round")) %>% 
+      hc_add_series(data = list_parse2(data.frame(fit_male$age, fit_male$.fitted)), yAxis = 1, lineWidth = 5,
+                    type = "line", showInLegend = FALSE, color = "cornflowerblue") %>% 
+      hc_add_series(data = list_parse2(data.frame(fit_female$age, fit_female$.fitted)), yAxis = 1, lineWidth = 5,
+                    type = "line", showInLegend = FALSE, color = "hotpink") %>% 
+      hc_add_series(data = list_parse2(tmp[, c("Age", "log10p")]), type = "line", showInLegend = FALSE, name = "log10p",
+                    color = "#9A839A", marker = list(radius = 6, enabled = T, color = "black"), lineWidth = 5) %>%
+      hc_xAxis(title = list(text = "Age (years)"), lineColor = "grey", min = 20, max = 70) %>%
+      hc_tooltip(formatter = JS("function(){
+                                if(this.point.series.name == 'log10p'){ 
+                                return '<b>Age</b>: ' + this.point.x + ' y.o., <br><b>log<sub>10</sub>(p-value)</b>: ' + Highcharts.numberFormat(this.point.y, 2);}
+                                else{return '<b>Age</b>: ' + this.point.x + ' y.o., <br><b>GE</b>: ' + Highcharts.numberFormat(this.point.y, 2) + ' logCPM';}
+                                }"), useHTML = TRUE)%>% 
+      hc_add_series(
+        data = list_parse2(data.frame(stats_male$x, stats_male$y)),
+        type = "scatter",
+        showInLegend = FALSE,
+        yAxis = 1,
+        name = "Entire Age Range (male)",
+        color = "blue", 
+        marker = list(radius = 10, symbol = "cross")
+      )%>% 
+      hc_add_series(
+        data = list_parse2(data.frame(stats_female$x, stats_female$y)),
+        type = "scatter",
+        showInLegend = FALSE,
+        yAxis = 1,
+        name = "Entire Age Range (female)",
+        color = "mediumvioletred",  # Set the line color to blue 
+        marker = list(radius = 10, symbol = "cross")
+      ) %>%  
+      hc_subtitle(text = statsAllAges_text, style = list(color = "black") ) 
+    
+  } else {
+    
+    statsAllAges_text <- paste0("Overall changes: p-value = ", round(allAges$pvalue,4), " | t-statistic = ", round(allAges$tvalue,2), " | logFC/year = ", round(abline$a,4)) #Change the logFC/year to logFC
+    
     fit_male <- loess(expression ~ age, data = GE[GE$sex == 1,])
     fit_male <- plyr::arrange(generics::augment(fit_male), age)
     
@@ -166,12 +257,15 @@ Line_pvaluevsAge <- function(gene, pvalueData, geneData, allAges, abline, tissue
                                 if(this.point.series.name == 'log10p'){ 
                                 return '<b>Age</b>: ' + this.point.x + ' y.o., <br><b>log<sub>10</sub>(p-value)</b>: ' + Highcharts.numberFormat(this.point.y, 2);}
                                 else{return '<b>Age</b>: ' + this.point.x + ' y.o., <br><b>GE</b>: ' + Highcharts.numberFormat(this.point.y, 2) + ' logCPM';}
-                                }"), useHTML = TRUE)
+                                }"), useHTML = TRUE) %>% 
+      hc_subtitle(text = statsAllAges_text, style = list(color = "black") ) 
+    
+    
     
   }
   
-  g <- g%>% 
-    hc_subtitle(text = statsAllAges_text, style = list(color = "black") ) 
+  # g <- g%>% 
+  #   hc_subtitle(text = statsAllAges_text, style = list(color = "black") ) 
   
   return(g)
 }
