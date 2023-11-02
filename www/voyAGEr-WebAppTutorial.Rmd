@@ -168,7 +168,7 @@ To examine *CDKN2A* expression changes across age:
 data <- "/mnt/scratch/home/CommonProjects/voyAGEr_2023/AppData_Sept2023"
 gene <- "CDKN2A"
 # Construct the full file path
-file_path <- paste0(data,"/DB_GeneExpressionV2/", gene,".RDS") 
+file_path <- paste0(data,"/DB_GeneExpression_correctGeneSymbol/", gene,".RDS") 
    
 # Add the data frame to the list, naming the list element with the gene name
 geneExpr_CDKN2A <- readRDS(file_path)
@@ -176,46 +176,46 @@ geneExpr_CDKN2A <- readRDS(file_path)
 ```
 
 ```{r include=F}
-Heatmap_LoessGEvsAge <- function(data)
-{
-  #a <- dbGetQuery(DBconnection, paste("SELECT * FROM", "A1BG_AS1", sep = " "))
-  a <- data
-  b <- data.frame()
-  for (k in unique(a$tissue))
-  {
-    fit <- a[a$tissue == k,]
-    fit <- loess(expression ~ age, data = fit)
-    b <- rbind(b, data.frame(age = 20:70, expression = predict(fit, 20:70), tissue = k))
-  }
-  b <- dcast(b, tissue~age, value.var = "expression")
-  rownames(b) <- b$tissue
-  b <- b[,-1]
-  b <- t(scale(t(b), scale = F))
-  i <- (hclust(dist(b)))
-  
-  b <- b[i$order, ]
-  #b[is.na(b)] <- -100
-  b <- melt(b)
-  colnames(b) <- c("tissue", "age", "expression")
- 
-  g <- hchart(b, type = "heatmap", hcaes(x = age, y = tissue, value = expression)) %>%
-    hc_colorAxis(stops = list(list(0.3, "dodgerblue"), list(0.5, "white"), list(0.7, "tomato")),
-                 min = -2, max = 2,
-                 reversed = F) %>%
-    hc_tooltip(formatter = JS("function(){if (!this.point.options.expression) 
-                            {return '<b>Age</b>: ' + this.point.age + ' y.o., <br><b>Tissue</b>: ' + this.point.tissue + ',<br><b>scaled GE </b>: No data'}
-  else
-  {return '<b>Age</b>: ' + this.point.age + ' y.o., <br><b>Tissue</b>: ' + this.point.tissue + ',<br><b>scaled GE</b>: ' + Highcharts.numberFormat(this.point.options.expression, 2);}
-                            }")) %>%
-    hc_legend(title = list(text = "<center>Gene Expression<br>(Z-scores)</center>", style = list(fontSize = '16px')),align = "right", layout = "vertical", verticalAlign = "top",reversed = TRUE) %>%
-    hc_xAxis(title = list(text = "Age (years)", style = list(fontSize = '18px')),
-             labels = list(style = list(fontSize = "14px"))) %>%
-    hc_yAxis(title = list(text = "Tissue", style = list(fontSize = '18px'))) 
-  
-  
-  
-  return(g)
-}
+# Heatmap_LoessGEvsAge <- function(data)
+# {
+#   #a <- dbGetQuery(DBconnection, paste("SELECT * FROM", "A1BG_AS1", sep = " "))
+#   a <- data
+#   b <- data.frame()
+#   for (k in unique(a$tissue))
+#   {
+#     fit <- a[a$tissue == k,]
+#     fit <- loess(expression ~ age, data = fit)
+#     b <- rbind(b, data.frame(age = 20:70, expression = predict(fit, 20:70), tissue = k))
+#   }
+#   b <- dcast(b, tissue~age, value.var = "expression")
+#   rownames(b) <- b$tissue
+#   b <- b[,-1]
+#   b <- t(scale(t(b), scale = F))
+#   i <- (hclust(dist(b)))
+#   
+#   b <- b[i$order, ]
+#   #b[is.na(b)] <- -100
+#   b <- melt(b)
+#   colnames(b) <- c("tissue", "age", "expression")
+#  
+#   g <- hchart(b, type = "heatmap", hcaes(x = age, y = tissue, value = expression)) %>%
+#     hc_colorAxis(stops = list(list(0.3, "dodgerblue"), list(0.5, "white"), list(0.7, "tomato")),
+#                  min = -2, max = 2,
+#                  reversed = F) %>%
+#     hc_tooltip(formatter = JS("function(){if (!this.point.options.expression) 
+#                             {return '<b>Age</b>: ' + this.point.age + ' y.o., <br><b>Tissue</b>: ' + this.point.tissue + ',<br><b>scaled GE </b>: No data'}
+#   else
+#   {return '<b>Age</b>: ' + this.point.age + ' y.o., <br><b>Tissue</b>: ' + this.point.tissue + ',<br><b>scaled GE</b>: ' + Highcharts.numberFormat(this.point.options.expression, 2);}
+#                             }")) %>%
+#     hc_legend(title = list(text = "<center>Gene Expression<br>(Z-scores)</center>", style = list(fontSize = '16px')),align = "right", layout = "vertical", verticalAlign = "top",reversed = TRUE) %>%
+#     hc_xAxis(title = list(text = "Age (years)", style = list(fontSize = '18px')),
+#              labels = list(style = list(fontSize = "14px"))) %>%
+#     hc_yAxis(title = list(text = "Tissue", style = list(fontSize = '18px'))) 
+#   
+#   
+#   
+#   return(g)
+# }
 ```
 
 ```{r CDKN2Aheatmap, fig.align = 'center', fig.cap="Heatmap of tissue-specific CDKN2A expression over age."}
