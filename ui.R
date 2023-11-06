@@ -299,10 +299,13 @@ shinyUI(fluidPage(
                                 
                       ))
              ),
-             navbarMenu("Module",
+             tabPanel("Module",
                         #icon = icon("object-ungroup"),
                         icon = icon("hubspot"),
-                        tabPanel("About",
+                        mainPanel(width = 12,
+                                  tabsetPanel(id = "home", type = "pills",
+                        tabPanel("Overview",
+                                 icon = icon("comments"),
                                  column(width = 12, style = "margin-bottom:50px",
                                         HTML('<center><img src="moduleMethod.png" height="530"></center>'),
                                         HTML("<font size='4'><br>For each tissue, a gene co-expression network was built based on the pairwise correlation in expression of all pairs of genes. 
@@ -310,6 +313,7 @@ shinyUI(fluidPage(
                                         <br>A module's behaviour over age can then be inquired with the expression of its eigengene, representative of its gene expression profile.</font>"))
                         ),
                         tabPanel("Results",
+                                 icon = icon("chart-line"),
                                  sidebarLayout(
                                    sidebarPanel2(width = 3,
                                                  pickerInput(inputId = "tissue_module", label = "Tissue", 
@@ -440,7 +444,7 @@ shinyUI(fluidPage(
                                              )
                                    )
                                  ))
-             )#,
+             )))#,
             #tabPanel("Tutorial", 
                      # icon = icon("file-text"),
                      # tags$iframe(style="height:800px; width:100%", src="voyAGEr-WebAppTutorial.html"))
