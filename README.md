@@ -65,7 +65,7 @@ setwd(dir = "voyAGEr-main/")
 
 After downloading the .zip file of the repository, please make sure you have installed the following libraries in your RStudio (and if you don't, install them with the `install.library("library_name")` command):
 
-`shiny`, `shinythemes`, `shinyWidgets`, `highcharter`, `shinycssloaders`, `manipulateWidget`, `fontawesome`, `viridis`, `RSQLite`, `tm`, `reshape2`, `plyr`, `htmltools`, `RColorBrewer`, `shinyBS`
+`shiny`, `shinythemes`, `shinyWidgets`, `highcharter`, `shinycssloaders`, `manipulateWidget`, `fontawesome`, `viridis`, `RSQLite`, `tm`, `reshape2`, `plyr`, `htmltools`, `RColorBrewer`, `shinyBS`, `DT`
 
 Finally, to launch the app, run the following commands:
 
