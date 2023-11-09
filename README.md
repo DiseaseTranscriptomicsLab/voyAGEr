@@ -50,7 +50,7 @@ setwd(dir = "path/to/download/repository")
 
 # download .zip file of the repository
 # from the "Clone or download - Download ZIP" button
-download.file(url = "<https://github.com/DiseaseTranscriptomicsLab/voyAGEr/archive/refs/heads/main.zip>" , 
+download.file(url = "https://github.com/DiseaseTranscriptomicsLab/voyAGEr/archive/refs/heads/main.zip" , 
               destfile = "voyAGEr.zip")
 
 # unzip the .zip file
