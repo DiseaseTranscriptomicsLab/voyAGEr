@@ -73,12 +73,15 @@ runApp()
 
 ### Docker 
 
+To launch the voyAGEr Shiny app, replicate the following commands in the terminal:
 
-1. Download GitHub repository to your computer:
+1. Download the GitHub repository to your computer:
 
 ```bash
 
-wget("https://github.com/DiseaseTranscriptomicsLab/voyAGEr/archive/refs/heads/main.zip")
+wget "https://github.com/DiseaseTranscriptomicsLab/voyAGEr/archive/refs/heads/main.zip"
+unzip main.zip
+cd voyAGEr-main
 
 ```
 
@@ -89,6 +92,17 @@ wget("https://github.com/DiseaseTranscriptomicsLab/voyAGEr/archive/refs/heads/ma
 docker build . -t arthurschneider/voyager
 
 ```
+
+3. Run the container:
+
+```bash
+
+docker run -d -p 8788:8787 -p 3838:3838 arthurschneider/voyager 
+
+```
+
+4. Open the voyAGEr app via the web browser at http://localhost:3838
+
 
 
 ## Feedback and support
