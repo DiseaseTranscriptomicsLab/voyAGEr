@@ -59,8 +59,6 @@ After downloading the .zip file of the repository, please make sure you have ins
 `shiny`, `shinythemes`, `shinyWidgets`, `highcharter`, `shinycssloaders`, `manipulateWidget`, `fontawesome`, `viridis`, `RSQLite`, `tm`, `reshape2`, `plyr`, `htmltools`, `RColorBrewer`, `shinyBS`
 
 Finally, to launch the app, run the following commands:
-source("ui.R") source("server.R")
-
 
 ```r
 # To load scripts
