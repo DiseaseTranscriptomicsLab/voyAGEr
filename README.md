@@ -109,7 +109,7 @@ docker build . -t diseasetranscriptomicslab/voyager
 
 ```bash
 
-docker run -d -p 8788:8787 -p 3838:3838 diseasetranscriptomicslab/voyager 
+docker run -d -p 8787:8787 -p 3838:3838 diseasetranscriptomicslab/voyager
 
 ```
 
