@@ -6,6 +6,7 @@
 
 voyAGEr is a web interface for the analysis of age-related gene expression alterations in GTEx human tissues. The app leverages RNA-seq datasets from the GTEx project (Lonsdale et al., 2013), encompassing tissue samples from hundreds of donors aged from 20 to 70 years.
 
+
 voyAGEr is composed of four main sections (the tabs in the navigation bar at the top):
 
 -   `Home` (depicted by the home icon): to visually explain the used method and its associated findings featured in the application.
@@ -126,3 +127,4 @@ If you have any feedback or questions, please feel free to open an issue in this
 > Alexandre Kaizeler ([alexandre.afonso\@medicina.ulisboa.pt](mailto:alexandre.afonso@medicina.ulisboa.pt))
 
 [Disease Transcriptomics Lab](https://imm.medicina.ulisboa.pt/group/distrans), 2023
+
