@@ -1,5 +1,5 @@
 FROM r-base:4.1.0
-MAINTAINER Arthur Schneider <arthur.schneider522@gmail.com>
+MAINTAINER Disease Transcriptomics Lab <imm-nmorais@medicina.ulisboa.pt>
 
 RUN apt-get update && apt-get -y upgrade && apt-get -y autoremove
 RUN apt-get install -y curl
