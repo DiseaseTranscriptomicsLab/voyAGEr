@@ -18,6 +18,15 @@ voyAGEr is composed of four main sections (the tabs in the navigation bar at the
 
 ![](www/Screenshot_voyAGEr.png)
 
+
+## Table of Contents 
+* [Web App Hosting](#web-app-hosting)
+* [Tutorials](#tutorials)
+* [Install and start running](#install-and-start-running) 
+    * [R Studio](#r-studio)
+    * [Docker](#docker)
+* [Feedback and support](#feedback-and-support) 
+
 ## Web App Hosting
 
 voyAGEr is freely available at <https://compbio.imm.medicina.ulisboa.pt/app/voyAGEr>
