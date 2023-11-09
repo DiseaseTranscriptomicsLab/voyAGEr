@@ -34,7 +34,7 @@ Please take into account that, in order to run voyAGEr's Shiny app, you must hav
 
 To download the repository from GitHub to R Studio, please run the following commands:
 
-´´´r
+```r
 
 # set working directory
 setwd(dir = "path/to/download/repository")
@@ -52,9 +52,9 @@ unzip(zipfile = "voyAGEr.zip")
 
 setwd(dir = "voyAGEr-main/")
 
-´´´
+```
 
-After downloading the .zip file of the repository, please make sure you have installed the following libraries in your RStudio (and if you don't, install them with the `install.library("libraryname")` command):
+After downloading the .zip file of the repository, please make sure you have installed the following libraries in your RStudio (and if you don't, install them with the `install.library("library_name")` command):
 
 `shiny`, `shinythemes`, `shinyWidgets`, `highcharter`, `shinycssloaders`, `manipulateWidget`, `fontawesome`, `viridis`, `RSQLite`, `tm`, `reshape2`, `plyr`, `htmltools`, `RColorBrewer`, `shinyBS`
 
@@ -62,13 +62,13 @@ Finally, to launch the app, run the following commands:
 source("ui.R") source("server.R")
 
 
-´´´r
+```r
 # To load scripts
 source("ui.R") 
 source("server.R")
 # To launch app
 runApp()
-´´´
+```
 
 
 ### Docker 
@@ -76,24 +76,24 @@ runApp()
 
 1. Download GitHub repository to your computer:
 
-´´´bash
+```bash
 
 wget("https://github.com/DiseaseTranscriptomicsLab/voyAGEr/archive/refs/heads/main.zip")
 
-´´´
+```
 
 2. Generate docker image:
 
-´´´bash
+```bash
 
 docker build . -t arthurschneider/voyager
 
-´´´
+```
 
 
 ## Feedback and support
 
-If you have any feedback or questions, please feel free to open an Issue in this GitHub repository, or contact us through the following emails:
+If you have any feedback or questions, please feel free to open an issue in this GitHub repository, or contact us through the following emails:
 
 > Rita Martins-Silva ([rita.silva\@medicina.ulisboa.pt](mailto:rita.silva@medicina.ulisboa.pt))
 >
