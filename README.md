@@ -37,7 +37,7 @@ voyAGEr is freely available at <https://compbio.imm.medicina.ulisboa.pt/app/voyA
 
 ## Install and start running
 
-Please take into account that, in order to run voyAGEr's Shiny app, you must have previously run the pre-processing pipeline on GTEx count data and metadata (with restricted access).
+⚠️ Please take into account that, in order to run voyAGEr's Shiny app, you must have previously run the **pre-processing pipeline** on GTEx count data and metadata (with restricted access). This repository only hosts the code for the Shiny App.
 
 ### R Studio
 
