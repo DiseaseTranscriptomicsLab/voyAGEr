@@ -87,6 +87,11 @@ To launch the voyAGEr Shiny app, replicate the following commands in the termina
 ```bash
 
 wget "https://github.com/DiseaseTranscriptomicsLab/voyAGEr/archive/refs/heads/main.zip"
+
+# For windows users without wget and unzip
+# Make sure the downloaded file is unzipped
+# curl -L "https://github.com/DiseaseTranscriptomicsLab/voyAGEr/archive/refs/heads/main.zip" -o main.zip
+
 unzip main.zip
 cd voyAGEr-main
 
