@@ -1,0 +1,4414 @@
+---
+title: "voyAGEr: Data Pre-Processing" 
+date: November, 2023
+output: html_document
+editor_options: 
+  chunk_output_type: inline
+---
+
+# General
+ 
+## Import libraries
+
+```{r libraries, echo=FALSE}
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(limma)
+library(edgeR)
+library(grid)
+library(gridExtra)
+library(knitr)
+library(ggpubr)
+library(gridExtra)
+library(latex2exp)
+library(mice)
+library(biomaRt)
+library(msigdbr)
+library(fgsea)
+library(tidyr)
+library(WGCNA)
+library(cowplot) 
+library(pheatmap)
+library(GWENA)
+library(Cairo)
+library(disgenet2r)
+```
+
+# A. Data Processing 
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Setup
+
+### Import data
+
+The read count tables used in the following sections consider previously aligned samples, retrieved from the GTEx portal (v8). *Sources:*
+
+* https://gtexportal.org/home/datasets
+* https://storage.googleapis.com/gtex_analysis_v8/rna_seq_data/GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_reads.gct.gz 
+
+The metadata used in this analysis is under protected access.
+
+
+#### Read Counts
+
+Preparation of the read count table, in order to have the canonical format (genes as rows, samples as columns). Given that the output from GTEx had duplicated genes, and managing the whole table was very slow, we decided to subset the table to only include the genes that were duplicated. From this table, we collapsed duplicated genes into only one row, by summing their expression for each sample. At the end, we merged the two subsets of the initial table.
+
+```{r}
+
+counts <- as.data.frame(fread("GTEx_Analysis_2017-06-05_v8_RNASeQCv1.1.9_gene_reads.gct"))
+counts$Name <- NULL
+counts[1:5,1:5]
+
+# Subset read count table to only include duplicated genes, in order to collapse their counts (otherwise it would be very slow)
+# Still, with a subset of genes it might take a while
+duplicatedgenes_names <- counts$Description[duplicated(counts$Description)]
+duplicatedgenes_idx <- which(counts$Description %in% duplicatedgenes_names)
+dupcounts <- counts[duplicatedgenes_idx,]
+dupcounts <- aggregate(dupcounts[,2:ncol(dupcounts)], by=list(Description=dupcounts$Description), FUN=sum)
+
+uniquegenes_idx <- which(!counts$Description %in% duplicatedgenes_names)
+uniquecounts <- counts[uniquegenes_idx,]
+
+# Check if final data has same dimensions as initial data
+length(uniquegenes_idx) + length(duplicatedgenes_idx) == nrow(counts)
+
+# Merge read count tables
+counts <- rbind(uniquecounts,dupcounts)
+dim(counts)
+row.names(counts) <- counts$Description
+counts$Description <- NULL
+counts[1:10,1:3]
+
+```
+
+#### Metadata
+
+Metadata including the exact age of the patient (`metadata_subject`) has restricted access, and as such will not be shared. 
+
+Metadata for the patient and for the sample were merged into a single metadata object.
+
+```{r}
+# Subject metadata
+metadata_subject <- as.data.frame(fread("GTEx_Analysis_2017-06-05_v8_Annotations_SubjectPhenotypesDS.txt"))
+
+# Sample metadata
+metadata_samples <- as.data.frame(fread("GTEx_Analysis_v8_Annotations_SampleAttributesDS.txt"))
+# table(metadata_samples$SMTSD)
+# add subject ID to sample metadata
+metadata_samples$SUBJID <- sub('^([^-]+-[^-]+).*', '\\1', metadata_samples$SAMPID)
+# Merge both metadatas
+metadata <- merge(metadata_samples,metadata_subject, by="SUBJID", all.x=TRUE)
+
+```
+
+
+### Functions
+
+```{r}
+# Function to retrieve read count data and metadata associated with a given tissue.
+
+get_tissue_GTEx <- function(readcounts, metadata, tissue){
+  
+  # SMTSD is the column that encodes for the tissue
+  idx_tissue <- which(metadata$SMTSD == tissue)
+  samples <- metadata[idx_tissue,]$SAMPID
+  subset_counts <- readcounts[,colnames(readcounts) %in% samples] 
+  subset_metadata <- metadata[metadata$SAMPID %in% colnames(subset_counts),]
+  
+  GTExobject <- list(tissue=tissue,
+                     nsamples=ncol(subset_counts), 
+                     metadata=subset_metadata,
+                     counts=subset_counts)
+  return(GTExobject)
+}
+
+```
+
+```{r}
+
+# This plot shows the cumulative reads of the genes ordered by their expression, for each sample
+# To use this function, please be aware that:
+#     - data: should be a numeric data.frame() object, with genes as rows and samples as columns
+#     - samples_to_plot: Which samples you desire to plot (names or indexes). If you want to use all samples, we suggest samples_to_plot=colnames(yourdata)
+#     - reads_in_percentage: boolean, if you wish to plot the cumulative reads by absolute value (FALSE, default) or by percentage of the total number of reads per sample (TRUE)
+# Output: list with the following entries:
+#     - plot: ggplot object, that you can use to plot and change parameters
+#     - data_to_plot: the data used to generate the plot
+
+
+# Examples:
+# plotcomplexity_1 <- complexityplot_byexprgenes(data=yourdata,samples_to_plot=c("TCGA-DM-A288-01A","TCGA-CM-6164-01A"), reads_in_percentage=FALSE)
+# plotcomplexity_1$plot #gives you the ggplot object 
+# plotcomplexity_1$data_to_plot # gives you the data.frame() object used to generate the plot
+
+# plotcomplexity_2 <- complexityplot_byexprgenes(data=yourdata,samples_to_plot=c(1:12), reads_in_percentage=TRUE) #this option uses the first 12 samples only
+
+complexityplot_byexprgenes <- function(data, samples_to_plot, reads_in_percentage=FALSE){
+  
+  final <- c()
+  #create new dataset that contains cumulative reads
+  for (sample in samples_to_plot){
+    temporary<- data[order(data[,sample],decreasing = TRUE),]
+    temporary <- cumsum(temporary[,sample])
+    final <- cbind(final, temporary)
+  }
+  final <- as.data.frame(final)
+  colnames(final) <- samples_to_plot
+  final <- as.data.table(final)
+  
+  
+  #this is the plot
+  finalmelt <- melt(final)
+  finalmelt <- cbind(finalmelt,rep(x=c(1:nrow(final)),length(unique(finalmelt$variable))))
+  colnames(finalmelt) <- c("Sample","CumulativeReads","GeneIndex")
+  
+  if(!reads_in_percentage){
+    (plt1 <- ggplot(data = finalmelt, aes(x=GeneIndex, y=log10(CumulativeReads), group=Sample, color=Sample)) + geom_line() +
+       theme_bw() + theme(legend.position="none")   + xlab("Gene Index") + ylab("Number of Reads (log10)") + 
+       theme(axis.line = element_line(colour = "black"),
+             panel.grid.minor = element_blank(),
+             panel.border = element_blank(),
+             panel.background = element_blank()))
+    data_to_plot <- finalmelt
+  } else {
+    orderfinal <- subset(finalmelt, GeneIndex == max(finalmelt$GeneIndex))
+    #as percentage
+    trial <- merge(orderfinal, finalmelt, by = "Sample", all=TRUE)
+    trial <- trial[,-3]
+    trial$percentage <- (trial$CumulativeReads.y / trial$CumulativeReads.x)
+    trial$percentage <- trial$percentage * 100
+    trial <- trial[,-c(2,3)]
+    colnames(trial) <- c("Sample","GeneIndex","PercentageCumulativeReads")
+    (plt1 <- ggplot(data = trial, aes(x=GeneIndex, y=PercentageCumulativeReads, group=Sample, color=Sample)) + geom_line() +
+        theme_bw() +theme(legend.position="none") + xlab("Gene Index") + ylab("Number of Reads (%)")+
+        theme(axis.line = element_line(colour = "black"),
+              panel.grid.minor = element_blank(),
+              panel.border = element_blank(),
+              panel.background = element_blank()) + xlim(c(0,20000)))
+    
+    data_to_plot <- trial
+  }
+  
+  return(list(plot=plt1,
+              data_to_plot=data_to_plot))
+}
+
+
+```
+
+
+```{r}
+
+# function to add coverage and complexity metrics per sample to the metadata of each tissue
+
+addCO <- function(GTExobj_tissue, complexityplot_data_tissue){
+  
+  metadata <- GTExobj_tissue$metadata
+  filtcounts <- GTExobj_tissue$filtcounts
+  coverage <- data.frame(SAMPID=colnames(filtcounts),
+                         coverage=colSums(filtcounts))
+  subset_complexityplot_data_tissue <- complexityplot_data_tissue[complexityplot_data_tissue$GeneIndex==1000,]
+  complexity <- data.frame(SAMPID=subset_complexityplot_data_tissue$Sample,
+                           complexity=subset_complexityplot_data_tissue$PercentageCumulativeReads) 
+  complexity <- complexity[match(metadata$SAMPID,complexity$SAMPID),]
+  coverage <- coverage[match(metadata$SAMPID,coverage$SAMPID),]
+  
+  metadata <- cbind(metadata,complexity$complexity, coverage$coverage )
+  colnames(metadata)[c(ncol(metadata)-1,ncol(metadata))] <- c("COMPMET","COVMET")
+  GTExobj_tissue$metadata <- metadata
+  
+  return(GTExobj_tissue)
+  
+}
+
+
+```
+
+Gene Counting Metrics:
+
+```{r}
+GeneNumberCounter <- function(GTExobj_tissue){
+  GeneNumber <- colSums(GTExobj_tissue$filtcounts>0)
+  GTExobj_tissue$metadata$GENMBER <- GeneNumber[GTExobj_tissue$metadata$SAMPID]
+  
+  return(GTExobj_tissue)
+}
+```
+
+```{r}
+
+# Function to filter genes with less than threshold_cpm CPMs in at least N samples
+# @param GTExobj_tissue GTEx object with tissue, counts, metadata and nsample information
+# @param threshold_cpm Minimum number of CPM in at least N% of the samples 
+# @param N Minimum number of samples with at least threshold_cpm CPMs
+#
+# @return GTExobj_tissue with new filtcounts (filtered raw counts) and ngenes (number of genes after filtering) parameters
+# @export
+#
+# @examples
+
+
+filtcounts <- function(GTExobj_tissue, threshold_cpm, N){
+  
+  GTExobj_tissue_CPM <- as.data.frame(cpm(GTExobj_tissue$counts))
+  genes_to_keep <- rowSums(GTExobj_tissue_CPM > threshold_cpm) > GTExobj_tissue$nsamples*(N/100)
+  GTExobj_tissue$filtcounts <- GTExobj_tissue$counts[genes_to_keep,]
+  GTExobj_tissue$ngenes <- nrow(GTExobj_tissue$filtcounts)
+  
+  return(GTExobj_tissue)
+  
+}
+
+```
+
+
+
+
+```{r}
+
+# Function to normalize gene counts
+# @param GTExobj_tissue GTEx object with tissue, counts, filtcounts, metadata, ngenes and nsample information 
+#
+# @return GTExobj_tissue with new normcounts (TMM normalized counts) and normcounts (TMM log2 normalized counts) parameters
+# @export
+#
+# @examples
+
+normcounts <- function(GTExobj_tissue){
+  
+  # Create DGEListo object, required for normalization with edgeR
+  GTExobj_tissue_dgeobj <- DGEList(GTExobj_tissue$filtcounts)
+  # Calculate normalization factors, using the TMM method, to be used in the normalization step
+  GTExobj_tissue_dgeobj <- calcNormFactors(GTExobj_tissue_dgeobj, method = "TMM")
+  # normalization and log transformation using the voom function
+  GTExobj_tissue_voomobj <- voom(GTExobj_tissue_dgeobj,plot=F)
+  # Extracting the logCPM's
+  GTExobj_tissue$logCPM <- as.data.frame(GTExobj_tissue_voomobj$E)
+  # Weights required to counteract the mean-variance trend in the data
+  GTExobj_tissue$weights <- as.data.frame(GTExobj_tissue_voomobj$weights)
+  
+  return(GTExobj_tissue)
+  
+}
+
+```
+
+
+
+## Create GTEx object
+
+The GTEx object is a list of lists. Each tissue can be accessed by the first level of the list. For each tissue, it first stores the tissue type, the number of samples, the associated metadata and the raw counts. After pre-processing the data, it will also store the counts after filtering lowly expressed genes (filtcounts) and respective number of genes considered for the rest of the analysis, the logCPM.
+
+```{r}
+# `GTEx.object`
+# |
+# |__ `Bladder`
+# |  |__ tissue
+# |  |__ nsamples
+# |  |__ metadata
+# |  |__ counts
+# |  |__ filtcounts
+# |  |__ ngenes
+# |  |__ logCPM
+# |  |__ weights
+# |
+# |__ `Whole Blood`
+# |  |__ tissue
+# |  |__ nsamples
+# |  |__ metadata
+# |  |__ counts
+# |  |__ filtcounts
+# |  |__ ngenes
+# |  |__ logCPM
+# |  |__ weights
+# |    
+# |__ (...)
+```
+
+
+```{r}
+GTEx.object <- list()
+for (tissue in unique(metadata$SMTSD)){
+  GTEx.object[[tissue]] <- get_tissue_GTEx(readcounts=counts,
+                                           metadata=metadata,
+                                           tissue=tissue)
+}
+
+# Example
+# GTEx.object$`Whole Blood`
+
+```
+
+
+```{r}
+# Example
+GTEx.object$`Whole Blood`$counts[1:10,1:3]
+```
+
+
+
+```{r}
+names(GTEx.object)
+```
+
+
+## Tissue Filtering
+
+Tissues with less than 50 samples were removed from the analysis. This resulted in the removal of the following 6 tissues:
+
+* Cervix - Ectocervix
+* Fallopian Tube
+* Cervix - Endocervix
+* Bladder
+* Kidney - Medulla
+* Cells - Leukemia cell line (CML)
+
+```{r fig.width=10, fig.height=6}
+
+number_samples <- c()
+
+for (tissue in names(GTEx.object)){
+  number_samples <- c(number_samples,GTEx.object[[tissue]]$nsamples)
+}
+
+number_samples <- data.frame(tissue=names(GTEx.object),
+                             nsamples=number_samples)
+number_samples$toremove <- ifelse(number_samples$nsamples>50, "FALSE","TRUE")
+
+ggplot(number_samples, aes(x=tissue, y=nsamples, fill=toremove)) +
+  geom_bar(stat="identity") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 70, hjust=1),
+        plot.title = element_text(hjust = 0.5 ),
+        plot.subtitle = element_text(hjust = 0.5),
+        legend.position="top") +
+  ggtitle("Number of samples per tissue") +
+  ylab("# samples") +
+  xlab("Tissue") +
+  geom_hline(yintercept = 50, linetype="dashed", color="#BA3B46") + 
+  scale_fill_manual(values = c("#53A2BE","#BA3B46"), name = "Tissue to remove?", labels = c("NO", "YES")) +
+  geom_text(data=number_samples[number_samples$toremove ==TRUE,], aes(y=50,label=nsamples), vjust=-0.5, color="#BA3B46", size=3.5) + theme(text=element_text(family = "Quicksand")) +
+  geom_text(data=number_samples[number_samples$toremove ==FALSE,], aes(y=nsamples,label=nsamples), vjust=-0.5, color="#53A2BE", size=2.5) + theme(text=element_text(family = "Quicksand"))
+
+```
+
+```{r}
+tissues_to_remove <- number_samples[number_samples$toremove==TRUE,]$tissue
+GTEx.object[tissues_to_remove] <- NULL
+print("Tissues to remove ---------------------------")
+tissues_to_remove
+print("Tissues to keep ---------------------------")
+names(GTEx.object)
+```
+
+
+## Sample Characterisation
+
+
+```{r fig.width=20, fig.height=25, warning=FALSE }
+
+plt_list_beforefilt <- list()
+
+for (tissue in names(GTEx.object)){
+  
+  plt_list_beforefilt[[tissue]] <- ggplot() + aes_string(x=colSums(GTEx.object[[tissue]]$counts)) +
+    geom_histogram(fill="lightgrey", color="grey", alpha=0.5, binwidth = (max(colSums(GTEx.object[[tissue]]$counts))-min(colSums(GTEx.object[[tissue]]$counts)))/100) + theme_bw() + 
+    theme(axis.text.x = element_text(angle = 45, hjust=1),
+          plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    ggtitle(tissue) +
+    xlab("") +
+    ylab("") + theme(text=element_text(family = "Quicksand"))
+  
+}
+
+grid.arrange(grobs= plt_list_beforefilt, ncol= 5, 
+             left = textGrob( "Frequency",gp=gpar(fontsize=20), rot = 90),
+             bottom =   textGrob(expression(Log[10] ~ Counts ~ per ~ Gene),gp=gpar(fontsize=20)),
+             top = textGrob("Sample coverage by tissue \n",gp=gpar(fontsize=25,fontface = "bold")))
+
+
+```
+
+
+
+```{r eval=FALSE, include=TRUE}
+plt_list_complexity <- list()
+plt_list_complexity_robj <- list()
+plt_list_complexity_table <- list()
+
+for (tissue in names(GTEx.object)){
+
+  plt_list_complexity_robj[[tissue]] <- complexityplot_byexprgenes(GTEx.object[[tissue]]$counts, colnames(GTEx.object[[tissue]]$counts), reads_in_percentage=TRUE)
+
+  plt_list_complexity[[tissue]] <- plt_list_complexity_robj[[tissue]]$plot   +
+    ggtitle(tissue) + theme(text=element_text(family = "Quicksand"))+
+    xlab("") +
+    ylab("")+ theme(axis.text.x = element_text(angle = 45, hjust=1),
+                    plot.title = element_text(hjust = 0.5),
+                    plot.subtitle = element_text(hjust = 0.5))
+
+  plt_list_complexity_table[[tissue]] <- plt_list_complexity_robj[[tissue]]$data_to_plot
+}
+
+
+grid.arrange(grobs= plt_list_complexity, ncol= 5,
+             left = textGrob( "Number of reads (%)",gp=gpar(fontsize=20), rot = 90),
+             bottom =   textGrob("Gene Index",gp=gpar(fontsize=20)),
+             top = textGrob("Sample complexity by tissue \n",gp=gpar(fontsize=25,fontface = "bold")))
+
+
+```
+
+  
+
+
+## Gene Filtering 
+
+```{r}
+i=1
+for (tissue in names(GTEx.object)){
+  print(paste0("Filtering ", tissue, " (",i,"/", length(names(GTEx.object)),")" ))
+  GTEx.object[[tissue]] <- filtcounts(GTExobj_tissue=GTEx.object[[tissue]],
+                                      threshold_cpm=1,
+                                      N=40)
+  i=i+1
+}
+
+```
+
+```{r}
+# Example
+GTEx.object$`Whole Blood`$filtcounts[1:10,1:3]
+```
+
+
+```{r fig.width=10, fig.height=6}
+
+number_genes <- c()
+
+for (tissue in names(GTEx.object)){
+  number_genes <- c(number_genes,GTEx.object[[tissue]]$ngenes)
+}
+
+number_genes <- data.frame(tissue=names(GTEx.object),
+                           ngenes=number_genes)
+
+ggplot(number_genes, aes(x=tissue, y=ngenes)) +
+  geom_bar(stat="identity", fill="grey") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 70, hjust=1),
+        plot.title = element_text(hjust = 0.5 ),
+        plot.subtitle = element_text(hjust = 0.5),
+        legend.position="top") +
+  ggtitle("Number of genes per tissue") +
+  ylab("# genes") +
+  xlab("Tissue") +
+  geom_text(aes(label=ngenes), vjust=-0.5, color="black", size=2.5, angle = 70, nudge_x=0.5, nudge_y=1000) + theme(text=element_text(family = "Quicksand"))
+
+```
+
+
+Before filtering lowly expressed genes:
+
+
+```{r fig.width=20, fig.height=25, warning=FALSE}
+
+plt_list_beforefilt <- list()
+
+for (tissue in names(GTEx.object)){
+  plt_list_beforefilt[[tissue]] <- ggplot() + aes_string(x=log10(rowSums(GTEx.object[[tissue]]$counts))) +
+    geom_density(fill="lightcoral", alpha=0.5) + theme_bw() + 
+    theme(axis.text.x = element_text(angle = 45, hjust=1),
+          plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    ggtitle(tissue) +
+    xlab("") +
+    ylab("") + theme(text=element_text(family = "Quicksand"))
+  
+}
+
+grid.arrange(grobs= plt_list_beforefilt, ncol= 5, 
+             left = textGrob( "Frequency",gp=gpar(fontsize=20), rot = 90),
+             bottom =   textGrob(expression(Log[10] ~ Counts ~ per ~ Gene),gp=gpar(fontsize=20)),
+             top = textGrob("Gene count distribution per tissue before filtering \n",gp=gpar(fontsize=25,fontface = "bold")))
+
+
+```
+
+
+
+After filtering lowly expressed genes:
+
+```{r fig.width=20, fig.height=25}
+
+
+plt_list_afterfilt <- list()
+
+for (tissue in names(GTEx.object)){
+  plt_list_afterfilt[[tissue]] <- ggplot() + aes_string(x=log10(rowSums(GTEx.object[[tissue]]$filtcounts))) +
+    geom_density(fill="darkseagreen3", alpha=0.5) + theme_bw() + 
+    theme(axis.text.x = element_text(angle = 45, hjust=1),
+          plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    ggtitle(tissue) +
+    xlab("") +
+    ylab("")  + theme(text=element_text(family = "Quicksand"))
+  
+}
+
+grid.arrange(grobs= plt_list_afterfilt, ncol= 5, 
+             left = textGrob( "Frequency",gp=gpar(fontsize=20), rot = 90),
+             bottom =   textGrob(expression(Log[10] ~ Counts ~ per ~ Gene),gp=gpar(fontsize=20)),
+             top = textGrob("Gene count distribution per tissue after filtering \n",gp=gpar(fontsize=25,fontface = "bold")))
+
+```
+
+
+
+
+This step serves to add the complexity and coverage metric to the metadata table.
+
+```{r}
+
+for (tissue in names(GTEx.object)){
+  GTEx.object[[tissue]] <- addCO(GTExobj_tissue=GTEx.object[[tissue]],
+                                 complexityplot_data_tissue=complexityplot_data[[tissue]])
+  GTEx.object[[tissue]] <- GeneNumberCounter(GTExobj_tissue = GTEx.object[[tissue]])
+}
+```
+
+
+
+## Gene Normalization 
+
+Read counts for those kept genes were used to calculate normalization factors to scale the raw library sizes, using function `calcNormFactors` from `edgeR` that implements the trimmed mean of M-values, and normalised accordingly and subsequently log-transformed with the `voom` function from package `limma`, which also estimates mean-variance relationships to be used in linear modelling.
+
+This step might take a while.
+
+```{r}
+i=1
+for (tissue in names(GTEx.object)){
+  print(paste0("Normalizing ", tissue, " (",i,"/", length(names(GTEx.object)),")" ))
+  GTEx.object[[tissue]] <- normcounts(GTExobj_tissue=GTEx.object[[tissue]])
+  i=i+1
+} 
+
+```
+
+
+```{r}
+# Example
+GTEx.object$`Whole Blood`$logCPM[1:10,1:3]
+```
+
+
+Before normalization:
+
+```{r fig.width=20, fig.height=35} 
+
+# To better visualize the normalization effect, we plot a subset of 30 samples, the 15 with most and least sequencing depth.
+
+plt_list_beforenorm <- list()
+
+for (tissue in names(GTEx.object)){
+  
+  libsize <- GTEx.object[[tissue]]$metadata[,c("SAMPID","COMPMET")]
+  libsize <- libsize[order(libsize[,"COMPMET"]),]
+  top_seq_samples <- libsize[c(c(1:15),c((nrow(libsize)-14):nrow(libsize))),]
+  samples_to_plot <- top_seq_samples$SAMPID
+  subsetfiltcounts <- GTEx.object[[tissue]]$filtcounts[,samples_to_plot]
+  subsetfiltcounts <- stack(as.data.frame(cpm(subsetfiltcounts, log = T)))
+  colnames(subsetfiltcounts) <- c("expression", "sampleID") 
+  
+  plt_list_beforenorm[[tissue]] <- ggplot(subsetfiltcounts, aes(sampleID,expression)) + 
+    geom_boxplot( fill="lightcoral",alpha=0.4)+ 
+    xlab("") + 
+    ylab("")   +  
+    theme_bw()+ 
+    theme(plot.title = element_text(hjust = 0.5),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank()) +
+    scale_fill_brewer(palette="Dark2") +
+    ggtitle(tissue) + theme(text=element_text(family = "Quicksand"))
+  
+}
+
+grid.arrange(grobs= plt_list_beforenorm, ncol= 5, 
+             left = textGrob(expression(Log[2] ~ CPM),gp=gpar(fontsize=20), rot = 90),
+             bottom =   textGrob( "Samples",gp=gpar(fontsize=20)),
+             top = textGrob("Before normalization - Top and Bottom Coverage \n",gp=gpar(fontsize=25,fontface = "bold")))
+
+
+plt_list_beforenorm <- list()
+
+for (tissue in names(GTEx.object)){
+  
+  libsize <- GTEx.object[[tissue]]$metadata[,c("SAMPID","COVMET")]
+  libsize <- libsize[order(libsize[,"COVMET"]),]
+  top_seq_samples <- libsize[c(c(1:15),c((nrow(libsize)-14):nrow(libsize))),]
+  samples_to_plot <- top_seq_samples$SAMPID
+  subsetfiltcounts <- GTEx.object[[tissue]]$filtcounts[,samples_to_plot]
+  subsetfiltcounts <- stack(as.data.frame(cpm(subsetfiltcounts, log = T)))
+  colnames(subsetfiltcounts) <- c("expression", "sampleID") 
+  
+  plt_list_beforenorm[[tissue]] <- ggplot(subsetfiltcounts, aes(sampleID,expression)) + 
+    geom_boxplot( fill="lightcoral",alpha=0.4)+ 
+    xlab("") + 
+    ylab("")   +  
+    theme_bw()+ 
+    theme(plot.title = element_text(hjust = 0.5),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank()) +
+    scale_fill_brewer(palette="Dark2") +
+    ggtitle(tissue) + theme(text=element_text(family = "Quicksand"))
+  
+}
+
+grid.arrange(grobs= plt_list_beforenorm, ncol= 5, 
+             left = textGrob(expression(Log[2] ~ CPM),gp=gpar(fontsize=20), rot = 90),
+             bottom =   textGrob( "Samples",gp=gpar(fontsize=20)),
+             top = textGrob("Before normalization - Top and Bottom Complexity \n",gp=gpar(fontsize=25,fontface = "bold")))
+
+
+
+
+```
+
+
+After normalization:
+
+```{r fig.width=20, fig.height=35} 
+
+plt_list_afternorm <- list()
+
+for (tissue in names(GTEx.object)){
+  libsize <- GTEx.object[[tissue]]$metadata[,c("SAMPID","COMPMET")]
+  libsize <- libsize[order(libsize[,"COMPMET"]),]
+  top_seq_samples <- libsize[c(c(1:15),c((nrow(libsize)-14):nrow(libsize))),]
+  samples_to_plot <- top_seq_samples$SAMPID
+  subsetlogcpm <- GTEx.object[[tissue]]$logCPM[,samples_to_plot]
+  subsetlogcpm <- stack(as.data.frame(subsetlogcpm))
+  colnames(subsetlogcpm) <- c("expression", "sampleID") 
+  
+  plt_list_afternorm[[tissue]] <- ggplot(subsetlogcpm, aes(sampleID,expression)) + 
+    geom_boxplot( fill="darkseagreen3",alpha=0.4)+ 
+    xlab("") + 
+    ylab("")   +  
+    theme_bw()+ 
+    theme(plot.title = element_text(hjust = 0.5),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank()) +
+    scale_fill_brewer(palette="Dark2") +
+    ggtitle(tissue) + theme(text=element_text(family = "Quicksand"))
+  
+}
+
+grid.arrange(grobs= plt_list_afternorm, ncol= 5, 
+             left = textGrob(expression(Log[2] ~ CPM),gp=gpar(fontsize=20), rot = 90),
+             bottom =   textGrob( "Samples",gp=gpar(fontsize=20)),
+             top = textGrob("After normalization  - Top and Bottom Coverage \n",gp=gpar(fontsize=25,fontface = "bold")))
+
+
+
+plt_list_afternorm <- list()
+
+for (tissue in names(GTEx.object)){
+  libsize <- GTEx.object[[tissue]]$metadata[,c("SAMPID","COVMET")]
+  libsize <- libsize[order(libsize[,"COVMET"]),]
+  top_seq_samples <- libsize[c(c(1:15),c((nrow(libsize)-14):nrow(libsize))),]
+  samples_to_plot <- top_seq_samples$SAMPID
+  subsetlogcpm <- GTEx.object[[tissue]]$logCPM[,samples_to_plot]
+  subsetlogcpm <- stack(as.data.frame(subsetlogcpm))
+  colnames(subsetlogcpm) <- c("expression", "sampleID") 
+  
+  plt_list_afternorm[[tissue]] <- ggplot(subsetlogcpm, aes(sampleID,expression)) + 
+    geom_boxplot( fill="darkseagreen3",alpha=0.4)+ 
+    xlab("") + 
+    ylab("")   +  
+    theme_bw()+ 
+    theme(plot.title = element_text(hjust = 0.5),
+          axis.text.x=element_blank(),
+          axis.ticks.x=element_blank()) +
+    scale_fill_brewer(palette="Dark2") +
+    ggtitle(tissue) + theme(text=element_text(family = "Quicksand"))
+  
+}
+
+grid.arrange(grobs= plt_list_afternorm, ncol= 5, 
+             left = textGrob(expression(Log[2] ~ CPM),gp=gpar(fontsize=20), rot = 90),
+             bottom =   textGrob( "Samples",gp=gpar(fontsize=20)),
+             top = textGrob("After normalization  - Top and Bottom Complexity \n",gp=gpar(fontsize=25,fontface = "bold")))
+
+
+```
+
+
+## Tissue Characterization
+
+### Variance
+
+```{r}
+
+VARCalc <- function(GTExobj,scale=F, center=T){
+  
+  varpertissue <- c()
+  
+  
+  i=1
+  for (tissue in names(GTExobj)){
+    print(paste0("Computing Variance of tissue ", tissue, " (",i,"/", length(names(GTEx.object)),")" ))
+    GTExobj_tissue <- GTExobj[[tissue]]
+    GTExcounts_tissue <- GTExobj_tissue$logCPM
+    
+    PCAobj_tissue <- prcomp(t(GTExcounts_tissue), scale=scale, center=center)
+    
+    
+    
+    variance = round(sum(PCAobj_tissue$sdev^2)/length(PCAobj_tissue$sdev),2)
+    
+    varpertissue <- rbind(varpertissue, c(tissue, variance))
+    i=i+1
+  }
+  
+  varpertissue <- as.data.frame(varpertissue)
+  colnames(varpertissue) <- c("tissue","totalvar") 
+  varpertissue$totalvar <- as.numeric(varpertissue$totalvar)
+  ggplot(varpertissue, aes(x=tissue, y=totalvar)) +
+    geom_bar(stat="identity", fill="grey") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 70, hjust=1),
+          plot.title = element_text(hjust = 0.5 ),
+          plot.subtitle = element_text(hjust = 0.5),
+          legend.position="top") +
+    ggtitle("Total variance per tissue") +
+    ylab(TeX("$\\Sigma$ Variance / #Samples")) +
+    xlab("Tissue") +
+    geom_text(aes(label=totalvar), vjust=-0.5, color="black", size=2.5, angle = 70, nudge_x=0.5, nudge_y=8) + theme(text=element_text(family = "Quicksand"))
+  
+  
+}
+```
+
+```{r fig.width=10, fig.height=6}
+VARCalc(GTEx.object,scale=F, center=T)
+
+```
+
+ 
+
+
+
+# B. Batch Effect Control
+ 
+## Functions to Check
+
+
+```{r}
+#Inputs
+## GTEx.object
+## Relevant Metadata columns 
+## List of PCAs to consider
+
+PCACalc <- function(GTExobj, tissue, scale=F, center=T, plot=T, counts="logCPM"){
+  
+  GTExobj_tissue <- GTExobj[[tissue]]
+  GTExcounts_tissue <- GTExobj_tissue[[counts]]
+  # GTExcounts_tissue <- 2^GTExcounts_tissue
+  # GTExcounts_tissue <- log2(GTExcounts_tissue+1)
+  
+  GTExmeta_tissue <- GTExobj_tissue$metadata
+  
+  #DGElist_tissue <- DGEList(counts=GTExcounts_tissue,samples=GTExmeta_tissue[match(colnames(GTExcounts_tissue),GTExmeta_tissue$SAMPID),])
+  PCAobj_tissue <- prcomp(t(GTExcounts_tissue), scale=scale, center=center)
+  
+  PCAobj_tissue$metadata <- GTExmeta_tissue[match(colnames(GTExcounts_tissue),GTExmeta_tissue$SAMPID),]
+  PCAobj_tissue$logCPM <- GTExcounts_tissue
+  
+  if (plot){
+    #calculate total variance explained by each principal component
+    var_explained =( PCAobj_tissue$sdev^2 / sum(PCAobj_tissue$sdev^2))*100
+    var_explained <- data.frame(PC=c(1:20), var=var_explained[1:20])
+    print(ggplot(var_explained, aes(x=PC, y=var)) + 
+            geom_col() + 
+            xlab("Principal Component") + 
+            ylab("Variance Explained (%)") +
+            ggtitle("Scree Plot", subtitle = tissue) +
+            ylim(0, 100) + theme_bw() + geom_text(aes(y=var,label=round(digits=2, var)), colour="#555555", vjust=-0.75, size=3) + 
+            theme(axis.text.x = element_text(angle = 45, hjust=1),
+                  plot.title = element_text(hjust = 0.5),
+                  plot.subtitle = element_text(hjust = 0.5)))
+  }
+  
+  
+  
+  return(PCAobj_tissue)
+  
+}
+
+PCACheck <- function(PCAobj_tissue, metacols="ALL", list_PCs=list(c(1,2), c(2,3)), threshold_vec="default"){
+  badcols <- c()
+  #This section exists to define what columns we want to check for batch effect.
+  if (metacols=="ALL"){
+    metacols=colnames(PCAobj_tissue$metadata)
+  }
+  #This section exists to define what thresholds should be used to alert us for potential batch effect.
+  if (threshold_vec=="default"){
+    threshold_vec <- c(10, 20, 0.3, 0.05)
+    
+  }
+  
+  names(threshold_vec) <- c("discrete_bin","discrete_nonbin","continuous", "pvalthresh")
+  #This section exists to extract the contributions of our PCs
+  PC.nums <- unique(unlist(list_PCs))
+  PCscores <-  PCAobj_tissue$x[,PC.nums]
+  
+  #This section exists to determine what class are the values within each column, and how many unique values there are
+  coltypes <- sapply(as.data.frame(PCAobj_tissue$metadata[,metacols]), FUN=class)
+  coltypes <- data.frame(colnames=metacols,
+                         colclass=coltypes,
+                         uniquevals=NA,
+                         coltype=NA, 
+                         row.names=NULL)
+  uniquevals <- sapply(as.data.frame(PCAobj_tissue$metadata[,metacols]), unique, simplify=F)
+  coltypes$uniquevals <- sapply(uniquevals, length)
+  imp_coltypes <- subset(coltypes, uniquevals!=1)
+  imp_coltypes <- subset(imp_coltypes, uniquevals!=ncol(PCAobj_tissue$logCPM))
+  
+  #This section processes the columns and gives them a new type considering class and unique values
+  for (i in 1:nrow(imp_coltypes)){
+    
+    if (imp_coltypes[i,"colclass"]=="numeric" ){
+      imp_coltypes[i,"coltype"] <- "continuous"
+    }
+    else if (imp_coltypes[i, "colclass"]=="logical"){
+      imp_coltypes[i, "coltype"] <- "discrete_bin"
+    }
+    else if (imp_coltypes[i, "colclass"]=="character"){
+      if (imp_coltypes[i, "uniquevals"]==2){
+        imp_coltypes[i, "coltype"] <- "discrete_bin"
+      }
+      else{
+        imp_coltypes[i, "coltype"] <- "discrete_nonbin"
+      }
+    }
+    else if (imp_coltypes[i, "colclass"]=="integer" | imp_coltypes[i, "colclass"]=="numeric"){
+      if (imp_coltypes[i, "uniquevals"]==2){
+        imp_coltypes[i, "coltype"] <- "discrete_bin"
+      }
+      else if (imp_coltypes[i, "uniquevals"]>2 & imp_coltypes[i, "uniquevals"]<=10){
+        imp_coltypes[i, "coltype"] <- "discrete_nonbin"
+      }
+      else{
+        imp_coltypes[i, "coltype"] <- "continuous"
+      }
+    }
+  }
+  
+  #Here, we do the actual checking for batch effect
+  #Assuming the order for metadata and counts columns are exactly the same
+  for (i in 1:nrow(imp_coltypes)){
+    #starting with the continuous variables (easier)
+    if (imp_coltypes[i, "coltype"]=="continuous"){
+      if(imp_coltypes[i, "uniquevals"]>2){
+        coltotest <- imp_coltypes[i, "colnames"]
+        coltotest <- PCAobj_tissue$metadata[,coltotest]
+        for (PC in colnames(PCscores)){
+          PCtotest <- as.numeric(PCscores[,PC])
+          cortest <- cor.test(coltotest, PCtotest, method = "spearman")
+          if (abs(cortest$estimate)>=threshold_vec["continuous"] & cortest$p.value<=threshold_vec["pvalthresh"]){
+            badcols <- rbind(badcols, c(imp_coltypes[i, "colnames"],"continuous",cortest$estimate,PC))
+          }
+        }
+        
+      }
+      
+    }
+    else if (imp_coltypes[i, "coltype"]=="discrete_bin"){
+      coltotest <- imp_coltypes[i, "colnames"]
+      coltotest <- PCAobj_tissue$metadata[,c(coltotest, "SAMPID")]
+      for (PC in colnames(PCscores)){
+        PCtotest <- as.data.frame(PCscores[,PC])
+        PCtotest$SAMPID <- row.names(PCtotest)
+        tabletotest <- merge(coltotest, PCtotest, by = "SAMPID")
+        tabletotest$SAMPID <- NULL
+        
+        # remove rows with NAs, as they don't provide info to calculate statistical parameters
+        tabletotest <- tabletotest[!is.na(tabletotest[,1]),]
+        # remove also levels with only one sample, as they will not give information for the statistical comparison
+        tabletotest <- tabletotest[tabletotest[,1] %in% names(which(table(tabletotest[,1])>1)),]
+        # only continue the analysis if we still have more than one value after the removal of uninformative rows
+        if (length(table(tabletotest[,1]))>1){
+          cortest <- t.test(tabletotest[,2] ~ tabletotest[,1], paired = FALSE)
+          if (abs(cortest$estimate)>=threshold_vec["discrete_bin"] & cortest$p.value<=threshold_vec["pvalthresh"]){
+            badcols <- rbind(badcols, c(imp_coltypes[i, "colnames"],"discrete_bin",cortest$statistic,PC))
+          }
+        }
+      }
+    }
+    else{
+      coltotest <- imp_coltypes[i, "colnames"]
+      coltotest <- PCAobj_tissue$metadata[,c(coltotest, "SAMPID")]
+      for (PC in colnames(PCscores)){
+        PCtotest <- as.data.frame(PCscores[,PC])
+        PCtotest$SAMPID <- row.names(PCtotest)
+        tabletotest <- merge(coltotest, PCtotest, by = "SAMPID")
+        tabletotest$SAMPID <- NULL
+        
+        # remove rows with NAs, as they don't provide info to calculate statistical parameters
+        tabletotest <- tabletotest[!is.na(tabletotest[,1]),]
+        # remove also levels with only one sample, as they will not give information for the statistical comparison
+        tabletotest <- tabletotest[tabletotest[,1] %in% names(which(table(tabletotest[,1])>1)),]
+        
+        # only continue the analysis if we still have more than one value after the removal of uninformative rows
+        if (length(table(tabletotest[,1]))>1){
+          
+          cortest <- aov(tabletotest[,2] ~ tabletotest[,1])
+          
+          if (abs(summary(cortest)[[1]][1,4])>=threshold_vec["discrete_nonbin"] & summary(cortest)[[1]][1,5]<=threshold_vec["pvalthresh"]){
+            badcols <- rbind(badcols, c(imp_coltypes[i, "colnames"],"discrete_nonbin",summary(cortest)[[1]][1,4],PC))
+          }
+        }
+      }
+    }
+  }
+  
+  if(!is.null(badcols)){
+    badcols <- as.data.frame(badcols)
+    colnames(badcols) <- c("colnames","type","value","PC")
+    badcols$PC <- gsub("PC","",badcols$PC)
+    
+    return(badcols)
+  } else {
+    return(NULL)
+  }
+  
+}
+
+
+
+PCAMaker <- function(PCA, tissue, metacols){
+  
+  if (is.null(metacols)==T){
+    return(NULL)
+  }
+  PCACounts <- PCA$x
+  PCACounts <- as.data.frame(PCACounts)
+  
+  PCAData <-  cbind(PCACounts,PCA$metadata) 
+  variance = PCA$sdev^2  
+  
+  plt_PCA <- list()
+  plt_corr <- list()
+  for(i in 1:nrow(metacols)){ 
+    
+    condition <- metacols[i,"colnames"]
+    PC_condition <- as.numeric(metacols[i,"PC"])
+    
+    if(PC_condition==1){
+      PC <- c(1,2)
+    } else {
+      PC <- c(1,PC_condition)
+    }
+    
+    pc_axis1 <- round(100*variance[PC[1]]/sum(variance),2)
+    pc_axis2 <- round(100*variance[PC[2]]/sum(variance),2)
+    
+    PCAData_subset <- PCAData[,c("SAMPID",metacols[i,"colnames"], paste0("PC",metacols[i,"PC"]) )]
+    colnames(PCAData_subset) <- c("SAMPID", "var", "PC")
+    PCAData_subset$PC <-  as.numeric(PCAData_subset$PC)
+    
+    
+    
+    if( metacols[i,"type"] == "continuous"){
+      
+      plt_PCA[[paste0(condition,"-PC",PC_condition)]] <- ggplot(PCAData, aes_string((paste0("PC",PC[1])),(paste0("PC",PC[2]))))+
+        geom_point( aes_string(colour=(condition)),size=5, alpha=0.6)+
+        ggtitle(label =tissue)+
+        xlab(paste0("PC",PC[1],": ",pc_axis1,"% variance")) +
+        ylab(paste0("PC",PC[2],": ",pc_axis2,"% variance")) +
+        theme_bw()+
+        theme(legend.position="bottom", legend.box="vertical", legend.margin=margin())  +  
+        geom_vline(xintercept=0, linetype="dotted") + 
+        geom_hline(yintercept=0, linetype="dotted") + 
+        labs(title = tissue, 
+             color = condition) + theme(plot.title = element_text(hjust = 0.5))
+      
+      
+      
+      plt_corr[[paste0(condition,"-PC",PC_condition)]] <- ggplot(PCAData_subset, aes(x = PC, y=var) ) +
+        geom_point(aes(color=var),size=4, alpha=0.8 )+
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, hjust=1),
+              plot.title = element_text(hjust = 0.5),
+              plot.subtitle = element_text(hjust = 0.5),
+              legend.position = "bottom") + scale_colour_continuous(name = metacols[i,"colnames"])+
+        ggtitle(tissue) +
+        ylab(metacols[i,"colnames"]) +
+        xlab(paste0("PC",metacols[i,"PC"])) +  
+        geom_smooth( method='lm', alpha=0.1, color="black")+stat_cor(method="spearman")
+      
+      print( plt_PCA[[paste0(condition,"-PC",PC_condition)]])
+      print(plt_corr[[paste0(condition,"-PC",PC_condition)]])
+      
+      
+    } 
+    else {
+      
+      PCAData[[condition]] <- as.factor(PCAData[[condition]])
+      plt_PCA[[paste0(condition,"-PC",PC_condition)]] <- ggplot(PCAData, aes_string((paste0("PC",PC[1])),(paste0("PC",PC[2]))))+
+        geom_point(aes(colour = !!sym(condition)), size=5, alpha=0.6)+ scale_color_discrete()+
+        ggtitle(label =tissue)+
+        xlab(paste0("PC",PC[1],": ",pc_axis1,"% variance")) +
+        ylab(paste0("PC",PC[2],": ",pc_axis2,"% variance")) +
+        theme_bw()+
+        theme(legend.position="bottom", legend.box="vertical", legend.margin=margin())  +  
+        geom_vline(xintercept=0, linetype="dotted") + 
+        geom_hline(yintercept=0, linetype="dotted") + 
+        labs(title = tissue, 
+             color = condition) + theme(plot.title = element_text(hjust = 0.5))
+      
+      
+      
+      plt_corr[[paste0(condition,"-PC",PC_condition)]] <- ggplot(PCAData_subset, aes(y = PC, x=factor(var)) ) + 
+        geom_violin(aes(fill=factor(var)), alpha=0.6)+
+        geom_point(color="#000000",size=2, alpha=0.2 )+ 
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 45, hjust=1),
+              plot.title = element_text(hjust = 0.5),
+              plot.subtitle = element_text(hjust = 0.5),
+              legend.position = "bottom")+
+        guides(color=guide_legend(metacols[i,"colnames"]),fill="none") +
+        ggtitle(tissue) +
+        xlab(metacols[i,"colnames"]) +
+        ylab(paste0("PC",metacols[i,"PC"]))
+      
+      print( plt_PCA[[paste0(condition,"-PC",PC_condition)]])
+      print(plt_corr[[paste0(condition,"-PC",PC_condition)]])
+      
+      
+      
+    }
+    
+    #   
+    # }
+    
+  }
+  
+  invisible(list(plt_PCA=plt_PCA,
+                 plt_corr=plt_corr))
+  
+}
+
+BatchEffectChecker <- function(GTExobj, tissue, scale=F, center=T, plot=T, metacols="ALL", list_PCs=list(c(1,2), c(2,3)), threshold_vec="default", compute_all=T, counts="logCPM"){
+  
+  pcaobj <- PCACalc(GTExobj=GTExobj, tissue=tissue, scale=scale, center=center, plot=plot,counts=counts)
+  
+  if(compute_all){
+    
+    possibleBatchcols <- PCACheck(pcaobj, metacols=metacols, list_PCs=list_PCs, threshold_vec=threshold_vec)
+    plots <- PCAMaker(pcaobj, tissue=tissue, metacols=possibleBatchcols)
+    #PCAMaker(pcaobj, tissue=tissue, metacols=possibleBatchcols)
+    
+    invisible(plots)
+  }
+  
+  
+}
+```
+
+
+## Functions to Correct (visualization only)
+
+```{r}
+# Now, you need to specify your batch variable. This will depend on how your metadata is structured
+# Assume 'batch' is the name of the column in your metadata that represents your batches
+
+# Now you can remove the batch effect
+
+
+BatchEffectCorrector <- function(GTExobj, tissue, batch_cols, plot=T, correct=F, list_PCs=list(c(1,2), c(2,3)), threshold_vec="default", rechecker=T, threshold_vec_aftercorrection="default", metacols_aftercorrection="ALL"){
+  
+  # Open a PDF device to send the plot to
+  pdf(file="/dev/null")
+  
+  GTExobj_tissue <- GTExobj[[tissue]]
+  LogNormCounts <- GTExobj_tissue$logCPM
+  metadata <- GTExobj_tissue$metadata
+  
+  # Open a connection to a null device (suppresses output)
+  sink(nullfile(), type = "output")
+  
+  # Perform imputation
+  temp_metadata <- mice(as.data.frame(metadata[,batch_cols]), m=5, method='pmm', seed = 500)
+  
+  # Take the first imputed dataset
+  metadata_imputed <- complete(temp_metadata, 1)
+  factorize <- ifelse(sapply(apply(metadata_imputed,2,unique),length)<10,TRUE,FALSE)
+  metadata_imputed[,factorize] <- sapply(metadata_imputed[,factorize], factor)
+  
+  
+  # Create your design matrix
+  design <- model.matrix(reformulate(paste0( c(0,batch_cols),collapse = " + ")), data=metadata_imputed)
+  
+  # Apply batch correction
+  corrected_counts <- removeBatchEffect(LogNormCounts, covariates = design)
+  
+  # Close the sink
+  sink(type = "output")
+  
+  GTExobj_tissue$cor_logCPM <- as.data.frame(corrected_counts)
+  
+  # Close the PDF device
+  dev.off()
+  
+  if (plot){
+    for (col in batch_cols){
+      
+      # Open a PDF device to send the plot to
+      pdf(file="/dev/null")
+      
+      
+      BeforePlot <- (BatchEffectChecker(GTExobj, tissue, metacols=col, list_PCs=list_PCs, threshold_vec=c(0, 0, 0, 1)))
+      GTExobj_auxiliary <- list()
+      GTExobj_auxiliary[[tissue]] <- GTExobj_tissue
+      AfterPlot <- (BatchEffectChecker(GTExobj_auxiliary, tissue, metacols=col, list_PCs=list_PCs, threshold_vec=c(0, 0, 0, 1), counts="cor_logCPM"))
+      
+      
+      # Close the PDF device
+      dev.off()
+      
+      for(i in c(1:length(BeforePlot$plt_PCA))){
+        
+        BeforePlot_PCA <- BeforePlot$plt_PCA[[i]] + ggtitle("")
+        BeforePlot_corr <- BeforePlot$plt_corr[[i]]+ ggtitle("")
+        
+        AfterPlot_PCA <- AfterPlot$plt_PCA[[i]]+ ggtitle("")
+        AfterPlot_corr <- AfterPlot$plt_corr[[i]]+ ggtitle("")
+        # Combine the plots using grid.arrange and add titles
+        combined_plot <- invisible(grid.arrange(
+          arrangeGrob(BeforePlot_PCA, BeforePlot_corr, nrow = 1, top = textGrob("Before", gp = gpar(fontsize = 16))),
+          arrangeGrob(AfterPlot_PCA, AfterPlot_corr, nrow = 1, top = textGrob("After", gp = gpar(fontsize = 16))),
+          ncol = 1,
+          top = textGrob(paste0(tissue, " - Batch Effect Correction \n"), gp = gpar(fontsize = 20))
+        ))
+        # Display the combined plot
+        print(combined_plot)
+      }
+      
+    }
+  }
+  
+  if (rechecker){
+    GTExobj_auxiliary <- list()
+    GTExobj_auxiliary[[tissue]] <- GTExobj_tissue
+    plots <- BatchEffectChecker(GTExobj_auxiliary, tissue, metacols="ALL", list_PCs=list_PCs, threshold_vec=threshold_vec_aftercorrection, counts="cor_logCPM")
+    if (is.null(plots)){
+      print("All possible batch effects were removed successfully! :3")
+    }
+  }
+  
+  if (correct){
+    GTExobj_tissue$notcor_logCPM <- GTExobj_tissue$logCPM
+    GTExobj_tissue$logCPM <- GTExobj_tissue$cor_logCPM
+    GTExobj_tissue$cor_logCPM <- NULL
+    #GTExobj[[tissue]] <- GTExobj_tissue
+  }
+  
+  
+  invisible(GTExobj_tissue)
+}
+
+```
+
+## Exploratory Analysis of Variables
+
+```{r fig.height=30}
+metadata_heat <- metadata
+coltypes <- sapply(as.data.frame( metadata_heat), FUN=class)
+coltypes <- data.frame(colnames=colnames( metadata_heat),
+                       colclass=coltypes,
+                       uniquevals=NA,
+                       coltype=NA, 
+                       row.names=NULL)
+uniquevals <- sapply(as.data.frame( metadata_heat), unique, simplify=F)
+coltypes$uniquevals <- sapply(uniquevals, length)
+imp_coltypes <- subset(coltypes, uniquevals!=1)
+imp_coltypes <- subset(imp_coltypes, uniquevals!=ncol( metadata_heat))
+
+colheat <- imp_coltypes$colnames  
+metadata_heat[,colheat][is.na( metadata_heat[,colheat])] <- "NA"
+# Convert categorical variables to dummy variables
+metadata_encoded <- metadata_heat[,colheat] %>%
+  mutate(across(where(is.character), as.factor)) %>%
+  mutate(across(where(is.factor), as.numeric))
+
+
+table(is.na(metadata_encoded))
+
+
+heatmap(cor(metadata_encoded, method="spearman"), symm=T, labRow = colnames(metadata_encoded), labCol = colnames(metadata_encoded) )
+```
+
+
+## Exploratory Analysis by Tissue
+
+We checked for batch effects on all the available tissues and found out that generally the data was confounded with COHORT, DTHHRDY, SMRIN and GENMBER (our metric to account for number of expressed genes). There were however, some more tissues that showed specific batch effects:
+
+* 'Skin - Sun Exposed', 'Cells - EBV-transformed lymphocites' and 'Kidney - Cortex' all showed HGHT (patient height) as a batch effect. As height had no correlation to the age of the patient, we did not remove this effect as it was not confounded with age.
+* 'Uterus' showed MHSMKYRS (smoking years) as a batch effect. As smoking years had a correlation with age, we opted to remove this effect as it was confounded with age.
+* All the brain tissues were not corrected for COHORT, as in those tissues COHORT only has one possible value and thus correction was useless.
+
+
+## Batch effect correction
+
+### Exploratory Analysis
+ 
+To blindly search for batch effects in a given tissue, consider the following code:
+
+```{r fig.height=8, fig.width=10}
+
+tissue <- "Spleen"
+
+BatchEffectChecker(GTExobj = GTEx.object, 
+                   tissue = tissue,  
+                   scale = F, 
+                   center = T,
+                   plot = T,  
+                   metacols="ALL", 
+                   list_PCs=list(c(1,2)), 
+                   threshold_vec="default", 
+                   compute_all = T)
+
+```
+ 
+### Correction
+
+```{r}
+GTEx.object.corrected <- GTEx.object
+
+braintissues <- c("Brain - Frontal Cortex (BA9)", 
+                  "Brain - Cortex", 
+                  "Pituitary", 
+                  "Brain - Cerebellum",
+                  "Brain - Cerebellar Hemisphere",
+                  "Brain - Caudate (basal ganglia)",
+                  "Brain - Nucleus accumbens (basal ganglia)",
+                  "Brain - Putamen (basal ganglia)",
+                  "Brain - Hypothalamus",
+                  "Brain - Spinal cord (cervical c-1)",
+                  "Brain - Hippocampus",
+                  "Brain - Anterior cingulate cortex (BA24)",
+                  "Brain - Substantia nigra",
+                  "Brain - Amygdala")
+
+#exceptions <- c("Uterus")
+exceptions <- NULL
+```
+
+```{r warning=F}
+
+i=1
+
+for (tissue in names(GTEx.object)){
+  print(paste0("Batch effect correction -  ", tissue, " (",i,"/", length(names(GTEx.object.corrected)),")" ))
+  
+  if (tissue %in% braintissues){
+    
+    batch_cols <- c("SMRIN", "GENMBER", "DTHHRDY")
+    
+  } else if (tissue %in% exceptions ){
+    
+    batch_cols <- c("COHORT","SMRIN", "GENMBER", "DTHHRDY","MHSMKYRS")
+    
+  } else {
+    batch_cols <- c( "COHORT","SMRIN", "GENMBER", "DTHHRDY")
+    
+  }
+  
+  
+  GTEx.object.corrected[[tissue]] <- invisible(BatchEffectCorrector(GTEx.object.corrected, 
+                                                                    tissue, 
+                                                                    batch_cols, 
+                                                                    plot=F, 
+                                                                    correct=T, 
+                                                                    list_PCs=list(c(1,2)), 
+                                                                    threshold_vec="default", 
+                                                                    rechecker=F, 
+                                                                    threshold_vec_aftercorrection="default", 
+                                                                    metacols_aftercorrection="ALL"))
+  i=i+1
+}
+
+ 
+
+
+```
+
+```{r}
+GTEx.object <- GTEx.object.corrected
+```
+
+
+# C. ShARP-LM
+
+## Functions 
+
+```{r}
+correctExpressionValues <- function(GTExobj, tissue, braintissues=c("Brain - Frontal Cortex (BA9)","Brain - Cortex", "Pituitary","Brain - Cerebellum","Brain - Cerebellar Hemisphere","Brain - Caudate (basal ganglia)","Brain - Nucleus accumbens (basal ganglia)","Brain - Putamen (basal ganglia)","Brain - Hypothalamus","Brain - Spinal cord (cervical c-1)","Brain - Hippocampus","Brain - Anterior cingulate cortex (BA24)","Brain - Substantia nigra","Brain - Amygdala") ){
+  
+  # Define batch variables to correct
+  if (tissue %in% braintissues){
+    batch_cols <- c("SMRIN","GENMBER","DTHHRDY")
+  } else {
+    batch_cols <- c("COHORT","SMRIN","GENMBER","DTHHRDY")
+  }
+  
+  filtcounts <- GTExobj[[tissue]]$filtcounts
+  metadata <- GTExobj[[tissue]]$metadata
+  
+  # METADATA IMPUTATION -------------------------------------------------------------------------------------------------------------------
+  # In case there is an NA in the batch variables to correct, this sample won't be considered in the model
+  # As such, if the number of NAs is low, we can perform imputation
+  
+   # Open a connection to a null device (suppresses output)
+  sink(nullfile(), type = "output")
+  
+  # Perform imputation
+  temp_metadata <- mice(as.data.frame(metadata[,batch_cols]), m=5, method='pmm', seed = 500)
+  # Take the first imputed dataset
+  metadata_imputed <- complete(temp_metadata, 1)
+  factorize <- ifelse(sapply(apply(metadata_imputed,2,unique),length)<10,TRUE,FALSE) # to define if a variable should be considered as discrete or not
+  metadata_imputed[,factorize] <- sapply(metadata_imputed[,factorize], as.character)
+  metadata_imputed <- as.data.frame(cbind(metadata_imputed,metadata[,c("AGE","SEX","SAMPID")]))
+  # Close the sink
+  sink(type = "output")
+  
+   
+  # CORRECTION OF EXPRESSION VALUES -------------------------------------------------------------------------------------------------------
+  
+  # Because the sharpLM model considers AGE and SEX centered
+  metadata_imputed_LM <- metadata_imputed
+  metadata_imputed_LM$AGE <- metadata_imputed_LM$AGE - mean(metadata_imputed_LM$AGE)
+  metadata_imputed_LM$SEX <- metadata_imputed_LM$SEX - mean(metadata_imputed_LM$SEX)
+
+  # Create your design matrix with batches
+  mm <- model.matrix(reformulate(paste0("AGE*SEX + ",paste0( batch_cols,collapse = " + "))), data=metadata_imputed_LM) 
+  D0 <- DGEList(filtcounts) 
+  D0 <- calcNormFactors(D0) 
+  y <- voom(D0, mm, plot = F) 
+  fit <- lmFit(y, mm)  
+  beta <- fit$coefficients[, -c(1:3,ncol(mm)), drop = FALSE]
+  beta[is.na(beta)] <- 0
+  corrcounts <- as.matrix(y$E) - beta %*% t(mm[,-c(1:3,ncol(mm)), drop = FALSE])
+  
+  offset <- apply(corrcounts,1,min) - apply(GTExobj[[tissue]]$logCPM,1,min)
+  corrcounts <- as.data.frame(corrcounts-offset)
+  
+  
+  GTExobj[[tissue]]$filtcounts <- NULL
+  GTExobj[[tissue]]$metadata <- metadata_imputed
+  GTExobj[[tissue]]$logCPM <- corrcounts
+  
+  return(GTExobj[[tissue]])
+}
+
+  
+```
+
+ 
+```{r}
+
+get_age_df <- function(min_window_size,window_size){
+  
+  df_ages <- NULL
+  
+  for (age in c(21:70)){
+    
+    if ((age) <= (20 + window_size - 1) & (age - 20) >= (min_window_size-1)){
+      
+      df_ages <- rbind(df_ages, c(20, age))
+      
+    } 
+    if (age > (20 + window_size - 1)){
+      
+      df_ages <- rbind(df_ages, c(age - window_size + 1,age))
+      
+    } 
+    
+    if ((age) > (70 - window_size + 1) & (70 - age) >= (min_window_size-1)) {
+      
+      df_ages <- rbind(df_ages, c(age, 70))
+      
+    }
+  }
+  
+  df_ages <- as.data.frame(df_ages)
+  df_ages <- df_ages[order(df_ages[,1]),]
+  row.names(df_ages) <- NULL
+  colnames(df_ages) <- c("minage","maxage")
+  
+  return(df_ages) 
+  
+}
+
+
+
+```
+
+ 
+```{r}
+
+fit_ShARPLM <- function(counts,metadata, tissue, braintissues=c("Brain - Frontal Cortex (BA9)","Brain - Cortex", "Pituitary","Brain - Cerebellum","Brain - Cerebellar Hemisphere","Brain - Caudate (basal ganglia)","Brain - Nucleus accumbens (basal ganglia)","Brain - Putamen (basal ganglia)","Brain - Hypothalamus","Brain - Spinal cord (cervical c-1)","Brain - Hippocampus","Brain - Anterior cingulate cortex (BA24)","Brain - Substantia nigra","Brain - Amygdala"), extendedResults=F ){
+  
+  # condition AGE : 2
+  # condition SEX : 3
+  # condition AGE:SEX : 4
+  
+  pval="P.Value"
+  
+  # Center variables 
+  metadata$AGE <- metadata$AGE - mean(metadata$AGE)
+  metadata$SEX <- metadata$SEX - mean(metadata$SEX)
+    
+    
+
+    mm <- model.matrix(~AGE*SEX, data=metadata) 
+    
+  if(nrow(mm) <= ncol(mm)){
+  results <- list(
+    AGE=NULL,
+    SEX=NULL,
+    AGEX=NULL
+  )
+  
+  return(results)
+  
+  }
+    
+    # D0 <- DGEList(filtcounts)
+    # D0 <- calcNormFactors(D0)
+    # y <- voom(D0, mm, plot = F)
+    # fit <- lmFit(y, mm)
+    fit <- lmFit(counts, mm) 
+    fitLM <- eBayes(fit)  
+    
+    if (!extendedResults){
+      
+      fitLM_AGE <- topTable(fitLM,2, n=Inf, sort.by="none")
+      fitLM_SEX <- topTable(fitLM,3, n=Inf, sort.by="none")
+      fitLM_AGEX <- topTable(fitLM,4, n=Inf, sort.by="none")
+      
+      results <- list(
+        AGE=fitLM_AGE,
+        SEX=fitLM_SEX,
+        AGEX=fitLM_AGEX
+      )
+      
+    } else {
+      
+      
+      coefsAGE <- as.data.frame(fitLM[["coefficients"]])[,c("(Intercept)","AGE")]
+      
+      if (!(c("SEX","AGE:SEX") %in% colnames(fitLM[["coefficients"]]))){
+        
+        coefsSEX <- NULL
+        coefsAGEX <- NULL
+        
+      } else {
+        
+        coefsSEX <- as.data.frame(fitLM[["coefficients"]])[,c("(Intercept)","SEX")]
+        coefsAGEX <- as.data.frame(fitLM[["coefficients"]])[,c("(Intercept)","AGE:SEX")]
+        
+      }
+      
+      
+        
+       results <- list(
+        coefsAGE=coefsAGE,
+        coefsSEX=coefsSEX,
+        coefsAGEX=coefsAGEX
+      )
+      
+    }
+    
+  return(results)
+}
+
+```
+
+
+```{r}
+
+get_LM <- function(GTExobj, tissue, df_age_lims,   braintissues=c("Brain - Frontal Cortex (BA9)","Brain - Cortex", "Pituitary","Brain - Cerebellum","Brain - Cerebellar Hemisphere","Brain - Caudate (basal ganglia)","Brain - Nucleus accumbens (basal ganglia)","Brain - Putamen (basal ganglia)","Brain - Hypothalamus","Brain - Spinal cord (cervical c-1)","Brain - Hippocampus","Brain - Anterior cingulate cortex (BA24)","Brain - Substantia nigra","Brain - Amygdala") ){
+  
+ 
+    pval="P.Value"
+    GTExobj_tissue <- GTExobj[[tissue]]
+    counts <- GTExobj_tissue$logCPM 
+    # filtcounts <- GTExobj_tissue$logCPM  
+    # filtcounts <- (2^filtcounts)*(10^6)
+    
+    metadata <- GTExobj_tissue$metadata
+  
+  genes <- row.names(counts)
+  genes <- genes[order(genes)]
+  AGE_pvalue <- data.frame(gene=genes)
+  AGE_t <- data.frame(gene=genes)
+  SEX_pvalue <-data.frame(gene=genes)
+  SEX_t <- data.frame(gene=genes)
+  AGEX_pvalue <- data.frame(gene=genes)
+  AGEX_t <- data.frame(gene=genes)
+  
+  AgeRepresentative_all <- c("gene")
+  vectorsamples <- c(1:length(metadata$SAMPID))
+  
+  for (i in c(1:nrow(df_age_lims))){
+    
+    metadata_subset <- metadata[metadata$AGE >= df_age_lims[i,1] & metadata$AGE <= df_age_lims[i,2],]
+    counts_subset <- counts[,metadata_subset$SAMPID]
+    AgeRepresentative <- round(mean(metadata_subset$AGE),2)
+    
+    # using rep so that we don't exclude the case where we want all ages at once
+    if (!all(vectorsamples==metadata_subset$SAMPID)){
+      
+      fitLM <- fit_ShARPLM(counts_subset,metadata_subset, tissue, braintissues=braintissues )
+      
+      if (is.null(fitLM$AGE)){
+        next
+      }
+      
+      # AGE
+      fitLM_AGE <- fitLM$AGE
+      
+      fitLM_AGE_tstat <- as.data.frame(cbind(row.names(fitLM_AGE),fitLM_AGE$t))
+      colnames(fitLM_AGE_tstat) <- c("gene",round(AgeRepresentative,2))
+      fitLM_AGE_tstat <- fitLM_AGE_tstat[order(fitLM_AGE_tstat$gene),] 
+      AGE_t <- cbind(AGE_t,as.numeric(fitLM_AGE_tstat[,2]))
+      
+      fitLM_AGE_pvalue <- as.data.frame(cbind(row.names(fitLM_AGE),fitLM_AGE[,pval])) # P.Value vs adj.P.Val
+      colnames(fitLM_AGE_pvalue) <- c("gene",round(AgeRepresentative,2))
+      fitLM_AGE_pvalue <- fitLM_AGE_pvalue[order(fitLM_AGE_pvalue$gene),] 
+      AGE_pvalue <- cbind(AGE_pvalue,as.numeric(fitLM_AGE_pvalue[,2] ))
+      
+      # SEX
+      fitLM_SEX <- fitLM$SEX
+      fitLM_SEX_tstat <- as.data.frame(cbind(row.names(fitLM_SEX),fitLM_SEX$t))
+      colnames(fitLM_SEX_tstat) <- c("gene",round(AgeRepresentative,2))
+      fitLM_SEX_tstat <- fitLM_SEX_tstat[order(fitLM_SEX_tstat$gene),] 
+      SEX_t <- cbind(SEX_t,as.numeric(fitLM_SEX_tstat[,2] ))
+      
+      fitLM_SEX_pvalue <- as.data.frame(cbind(row.names(fitLM_SEX),fitLM_SEX[,pval]))
+      colnames(fitLM_SEX_pvalue) <- c("gene",round(AgeRepresentative,2))
+      fitLM_SEX_pvalue <- fitLM_SEX_pvalue[order(fitLM_SEX_pvalue$gene),] 
+      SEX_pvalue <- cbind(SEX_pvalue,as.numeric(fitLM_SEX_pvalue[,2] ))
+      
+      # AGEX
+      fitLM_AGEX <- fitLM$AGEX
+      fitLM_AGEX_tstat <- as.data.frame(cbind(row.names(fitLM_AGEX),fitLM_AGEX$t))
+      colnames(fitLM_AGEX_tstat) <- c("gene",round(AgeRepresentative,2))
+      fitLM_AGEX_tstat <- fitLM_AGEX_tstat[order(fitLM_AGEX_tstat$gene),] 
+      AGEX_t <- cbind(AGEX_t,as.numeric(fitLM_AGEX_tstat[,2] ))
+      
+      fitLM_AGEX_pvalue <- as.data.frame(cbind(row.names(fitLM_AGEX),fitLM_AGEX[,pval]))
+      colnames(fitLM_AGEX_pvalue) <- c("gene",round(AgeRepresentative,2))
+      fitLM_AGEX_pvalue <- fitLM_AGEX_pvalue[order(fitLM_AGEX_pvalue$gene),] 
+      AGEX_pvalue <- cbind(AGEX_pvalue,as.numeric(fitLM_AGEX_pvalue[,2] ))
+      
+      AgeRepresentative_all <- c(AgeRepresentative_all,AgeRepresentative)
+      
+    }
+    
+    vectorsamples <- metadata_subset$SAMPID
+    
+  }
+  
+  colnames(AGE_pvalue) <- AgeRepresentative_all
+  colnames(AGE_t) <- AgeRepresentative_all
+  colnames(SEX_pvalue) <- AgeRepresentative_all
+  colnames(SEX_t) <- AgeRepresentative_all
+  colnames(AGEX_pvalue) <- AgeRepresentative_all
+  colnames(AGEX_t) <- AgeRepresentative_all
+  
+  fitLM_ojb <- list()
+  fitLM_ojb[["AGE"]] <- list()
+  fitLM_ojb[["AGE"]][["pval"]] <- AGE_pvalue
+  fitLM_ojb[["AGE"]][["t"]] <- AGE_t
+  fitLM_ojb[["SEX"]] <- list()
+  fitLM_ojb[["SEX"]][["pval"]] <- SEX_pvalue
+  fitLM_ojb[["SEX"]][["t"]] <- SEX_t
+  fitLM_ojb[["AGEX"]] <- list()
+  fitLM_ojb[["AGEX"]][["pval"]] <- AGEX_pvalue
+  fitLM_ojb[["AGEX"]][["t"]] <- AGEX_t
+  
+  return(fitLM_ojb)
+}
+
+
+
+
+```
+
+
+
+```{r}
+#adapted to get the coefs to plot y=ax + b
+get_LM_adapted <- function(GTExobj, tissue, df_age_lims,   braintissues=c("Brain - Frontal Cortex (BA9)","Brain - Cortex", "Pituitary","Brain - Cerebellum","Brain - Cerebellar Hemisphere","Brain - Caudate (basal ganglia)","Brain - Nucleus accumbens (basal ganglia)","Brain - Putamen (basal ganglia)","Brain - Hypothalamus","Brain - Spinal cord (cervical c-1)","Brain - Hippocampus","Brain - Anterior cingulate cortex (BA24)","Brain - Substantia nigra","Brain - Amygdala") ){
+  
+ 
+    pval="P.Value"
+    GTExobj_tissue <- GTExobj[[tissue]]
+    counts <- GTExobj_tissue$logCPM 
+    # filtcounts <- GTExobj_tissue$logCPM  
+    # filtcounts <- (2^filtcounts)*(10^6)
+    
+    metadata <- GTExobj_tissue$metadata
+  
+  genes <- row.names(counts)
+  genes <- genes[order(genes)]
+  AGE_pvalue <- data.frame(gene=genes)
+  AGE_t <- data.frame(gene=genes)
+  SEX_pvalue <-data.frame(gene=genes)
+  SEX_t <- data.frame(gene=genes)
+  AGEX_pvalue <- data.frame(gene=genes)
+  AGEX_t <- data.frame(gene=genes)
+  
+  AgeRepresentative_all <- c("gene")
+  vectorsamples <- c(1:length(metadata$SAMPID))
+  
+ 
+    
+    metadata_subset <- metadata
+    counts_subset <- counts[,metadata_subset$SAMPID]
+    AgeRepresentative <- round(mean(metadata_subset$AGE),2)
+     
+      
+      fitLM <- fit_ShARPLM(counts_subset,metadata_subset, tissue, braintissues=braintissues, extendedResults=T )
+       
+      fitLM_AGE <- fitLM$coefsAGE
+      fitLM_SEX <- fitLM$coefsSEX
+      fitLM_AGEX <- fitLM$coefsAGEX
+       
+      colnames(fitLM_AGE) <- c("b","a") # b is intercept, a is logFC
+      colnames(fitLM_SEX) <- c("b","a")
+      colnames(fitLM_AGEX) <- c("b","a")
+      
+      
+      fitLM_AGE$gene <- row.names(fitLM_AGE)
+      fitLM_AGE$variable <- rep("AGE",nrow(fitLM_AGE))
+      
+      fitLM_SEX$gene <- row.names(fitLM_SEX)
+      fitLM_SEX$variable <- rep("SEX",nrow(fitLM_SEX))
+      
+      fitLM_AGEX$gene <- row.names(fitLM_AGEX)
+      fitLM_AGEX$variable <- rep("AGEX",nrow(fitLM_AGEX))
+      
+      fitLM_AGE <- fitLM_AGE[,c("gene","a","b","variable")]
+      fitLM_SEX <- fitLM_SEX[,c("gene","a","b","variable")]
+      fitLM_AGEX <- fitLM_AGEX[,c("gene","a","b","variable")]
+      
+      
+      if (tissue %in% c("Ovary","Uterus","Vagina","Prostate","Testis")){
+        
+        fitLM_ojb <- fitLM_AGE 
+        
+      } else {
+        
+        fitLM_ojb <- rbind(fitLM_AGE,
+                           fitLM_SEX, 
+                           fitLM_AGEX)
+        
+      }
+
+  
+  # fitLM_ojb <- list()
+  # fitLM_ojb[["AGE"]] <- fitLM_AGE 
+  # fitLM_ojb[["SEX"]] <- fitLM_SEX 
+  # fitLM_ojb[["AGEX"]] <- fitLM_AGEX 
+  
+  return(fitLM_ojb)
+}
+
+
+```
+
+```{r}
+
+fit_ShARPLM_pvalues <- function(counts,metadata, tissue, braintissues=c("Brain - Frontal Cortex (BA9)","Brain - Cortex", "Pituitary","Brain - Cerebellum","Brain - Cerebellar Hemisphere","Brain - Caudate (basal ganglia)","Brain - Nucleus accumbens (basal ganglia)","Brain - Putamen (basal ganglia)","Brain - Hypothalamus","Brain - Spinal cord (cervical c-1)","Brain - Hippocampus","Brain - Anterior cingulate cortex (BA24)","Brain - Substantia nigra","Brain - Amygdala")){
+  
+    pval="P.Value" 
+  
+  fitLM <- fit_ShARPLM(counts,metadata, tissue,braintissues=braintissues)
+  
+  p.values_AGE <- fitLM$AGE[,pval]
+  p.values_SEX <- fitLM$SEX[,pval]
+  p.values_AGEX <- fitLM$AGEX[,pval]
+  
+  if(anyNA(p.values_AGE)){
+    p.values_AGE <- NULL
+  } 
+    if(anyNA(p.values_SEX)){
+    p.values_SEX <- NULL
+    } 
+    if(anyNA(p.values_AGEX)){
+    p.values_AGEX <- NULL
+  } 
+ 
+  p.values <- list(
+    AGE=p.values_AGE,
+    SEX=p.values_SEX,
+    AGEX=p.values_AGEX
+  )
+  
+  return(p.values)
+  
+}
+
+
+
+get_peaksFDR <- function(GTExobj, tissue, df_age_lims, nb_permutations = 1000000, sig = 0.01, verbose=F,braintissues=c("Brain - Frontal Cortex (BA9)","Brain - Cortex", "Pituitary","Brain - Cerebellum","Brain - Cerebellar Hemisphere","Brain - Caudate (basal ganglia)","Brain - Nucleus accumbens (basal ganglia)","Brain - Putamen (basal ganglia)","Brain - Hypothalamus","Brain - Spinal cord (cervical c-1)","Brain - Hippocampus","Brain - Anterior cingulate cortex (BA24)","Brain - Substantia nigra","Brain - Amygdala")){
+  
+  GTExobj_tissue <- GTExobj[[tissue]]
+  # filtcounts <- GTExobj_tissue$logCPM  
+  # filtcounts <- (2^filtcounts)*(10^6)
+  counts <- GTExobj_tissue$logCPM  
+  metadata <- GTExobj_tissue$metadata
+  
+  FDR <- data.frame(NULL)
+  
+  vectorsamples <- metadata$SAMPID
+  
+  for (i in c(1:nrow(df_age_lims))){
+    
+    metadata_subset <- metadata[metadata$AGE >= df_age_lims[i,1] & metadata$AGE <= df_age_lims[i,2], ]
+    counts_subset <- counts[,metadata_subset$SAMPID]
+    AgeRepresentative <- round(mean(metadata_subset$AGE),2)
+    
+    if (!all(vectorsamples==metadata_subset$SAMPID)){
+    
+    # Get p-value distribution for nb_permutations permutations of each condition ----------------------------------------------------------
+  
+      # AGE
+      
+      fitLM <- fit_ShARPLM_pvalues(counts_subset,metadata_subset,tissue,braintissues=braintissues)
+    if (is.null(fitLM$AGE)){
+      next
+    }
+      
+      p.values.AGE <- fitLM$AGE
+      real_nbsigGenes_AGE <- sum(p.values.AGE < sig)
+      perc_sigGenes_AGE <- real_nbsigGenes_AGE/length(p.values.AGE)*100
+      
+      if (!(tissue %in% c("Ovary","Uterus","Vagina","Prostate","Testis"))){
+                
+        if (is.null(fitLM$SEX) | is.null(fitLM$AGEX)){
+          next
+        }
+        
+        # SEX
+        p.values.SEX <- fitLM$SEX
+        real_nbsigGenes_SEX <- sum(p.values.SEX < sig)
+        perc_sigGenes_SEX <- real_nbsigGenes_SEX/length(p.values.SEX)*100   
+        
+        # AGEX
+        p.values.AGEX <- fitLM$AGEX
+        real_nbsigGenes_AGEX <- sum(p.values.AGEX < sig) 
+        perc_sigGenes_AGEX <- real_nbsigGenes_AGEX/length(p.values.AGEX)*100     
+        
+        permutation_SEX <- 0
+        permutation_AGEX <- 0
+      }
+      
+      
+      # Get original number of differentially expressed genes -------------------------------------------------------------------------------
+      permutation_AGE <- 0
+      
+      #print(paste0("Age: ",AgeRepresentative, " ------------------"))
+      
+      for (i in c(1:nb_permutations)){
+         
+        # Permutation of SAMPIDs
+        #         metadata_subset_permutation <- metadata_subset
+        # metadata_subset_permutation$AGE <- sample(metadata_subset_permutation$AGE )
+        
+        metadata_subset_permutation <- metadata_subset 
+        metadata_subset_permutation$AGE <- sample(metadata_subset_permutation$AGE )
+        metadata_subset_permutation$SEX <- sample(metadata_subset_permutation$SEX )
+
+        # Run model
+        ShARP_LM_permutations <-   fit_ShARPLM_pvalues(counts_subset,metadata_subset_permutation,tissue)
+        
+        # Get p values
+        
+        # AGE 
+        p.values.AGE <- ShARP_LM_permutations$AGE
+        permutation_AGE <- permutation_AGE + (sum(p.values.AGE<=sig) >= real_nbsigGenes_AGE)
+        
+        if (!(tissue %in% c("Ovary","Uterus","Vagina","Prostate","Testis"))){
+          # SEX 
+          p.values.SEX <- ShARP_LM_permutations$SEX
+          permutation_SEX <- permutation_SEX + (sum(p.values.SEX<=sig) >= real_nbsigGenes_SEX)
+          
+          # AGEX 
+          p.values.AGEX <- ShARP_LM_permutations$AGEX
+          permutation_AGEX <- permutation_AGEX + (sum(p.values.AGEX<=sig) >= real_nbsigGenes_AGEX)
+        }
+        
+      }
+ 
+    
+    
+    
+    if (!(tissue %in% c("Ovary","Uterus","Vagina","Prostate","Testis"))){
+      ageRep_FDR <- rbind(
+        # AGE
+        c(AgeRepresentative, round(perc_sigGenes_AGE,6), permutation_AGE/nb_permutations, tissue, ifelse(permutation_AGE/nb_permutations<=sig, "sig", "not sig"), "Age"),
+        # SEX
+        c(AgeRepresentative, round(perc_sigGenes_SEX,6), permutation_SEX/nb_permutations, tissue, ifelse(permutation_SEX/nb_permutations<=sig, "sig", "not sig"), "Gender"),
+        #AGE:SEX
+        c(AgeRepresentative, round(perc_sigGenes_AGEX,6), permutation_AGEX/nb_permutations, tissue, ifelse(permutation_AGEX/nb_permutations<=sig, "sig", "not sig"), "Int_Age_Gender")
+      )
+      
+    } else {
+      
+      ageRep_FDR <- c(AgeRepresentative, round(perc_sigGenes_AGE,6), permutation_AGE/nb_permutations, tissue, ifelse(permutation_AGE/nb_permutations<=sig, "sig", "not sig"), "Age") 
+      
+    }
+    
+    
+    
+    FDR <- as.data.frame(rbind(FDR,ageRep_FDR))
+    }
+    
+    vectorsamples <- metadata_subset$SAMPID
+    
+  }
+  
+  if(nrow(FDR)==0){
+    return(NULL)
+  }
+  
+  colnames(FDR) <- c("age","PercSigGene","pvalue","tissue","sig", "variable")
+  FDR$age <- as.numeric(FDR$age)
+  FDR$PercSigGene <- as.numeric(FDR$PercSigGene)
+  FDR$pvalue <- as.numeric(FDR$pvalue)
+  
+  return(FDR)
+  
+}
+
+
+```
+
+
+## Run
+
+### FDR
+
+Ran in a separate script, as it took approximately two weeks with parallelization.
+
+```{r}
+# ageDF <- get_age_df(min_window_size=11,
+#                     window_size=16)
+# 
+# set.seed(14082023)
+# 
+# registerDoParallel(cores=50)
+#  
+# peaks_FDR_list <- foreach(tissue = names(GTEx.object), .packages = c("data.table","dplyr","limma","edgeR","grid","gridExtra","mice","foreach","doParallel")) %dopar% {
+#   
+#   start <- Sys.time()
+#   print(paste0("Running FDR: ", tissue, "; time: ", start))
+#   
+#   
+#   
+#   # Open a connection to a null device (suppresses output)
+#   sink(nullfile(), type = "output")
+#   peaks_FDR_aux <-  get_peaksFDR(GTExobj=GTEx.object, 
+#                                  tissue=tissue, 
+#                                  df_age_lims=ageDF, 
+#                                  nb_permutations = 50000, 
+#                                  sig = 0.01)
+#   # Close the sink
+#   sink(type = "output")
+#    
+#   print(paste0("DONE: ", tissue, "; Elapsed time: ", Sys.time() - start))
+#   return(as.data.frame(peaks_FDR_aux))
+# }
+# 
+# # Convert the list back to a data frame if required
+# peaks_FDR <- do.call(rbind, peaks_FDR_list)
+# 
+# saveRDS(peaks_FDR,"AppData/peaks_plot_2.RDS")
+# 
+# stopImplicitCluster()
+ 
+```
+
+
+## Linear Models
+
+sharpLM.object
+    |
+    |__ tissue
+          |
+          |__ AGE
+          |     |
+          |     |__ pval (data frame, one column per age window, one row per gene)
+          |     |__ t (data frame, one column per age window, one row per gene)
+          |
+          |__ SEX
+          |     |
+          |     |__ pval (data frame, one column per age window, one row per gene)
+          |     |__ t (data frame, one column per age window, one row per gene)                
+          |
+          |__ AGEX
+                |
+                |__ pval (data frame, one column per age window, one row per gene)
+                |__ t (data frame, one column per age window, one row per gene)      
+                
+          
+          
+### Age windows = 16 yo
+
+```{r}
+ageDF <- get_age_df(min_window_size=11,
+                    window_size=16)
+
+ageDF
+```
+
+```{r warning=F}
+
+GTEx.object <- list()
+
+i=1
+for (tissue in names(GTEx.object)){
+  
+  print(paste0("Batch effect correction -  ", tissue, " (",i,"/", length(names(GTEx.object)),")" ))
+   
+  GTEx.object[[tissue]] <- invisible(correctExpressionValues(GTExobj=GTEx.object, 
+                                                                         tissue=tissue))
+  i=i+1
+}
+
+```
+
+
+```{r warning=F, message=F}
+sharpLM.object <- list()
+
+i=1
+
+for (tissue in names(GTEx.object)){
+  
+  print(paste0("Running ShARP-LM: ", tissue, " (",i,"/", length(names(GTEx.object)),")" ))
+  
+  sharpLM.object[[tissue]] <-  get_LM(GTExobj=GTEx.object, 
+                                                  tissue=tissue, 
+                                                  df_age_lims=ageDF)
+  
+  i=i+1
+} 
+
+```
+
+```{r}
+
+sex_specific_tissues <- c("Ovary","Uterus","Vagina","Prostate","Testis")
+
+for (tissue in sex_specific_tissues){
+  
+  sharpLM.object[[tissue]][["SEX"]] <-  NULL
+  sharpLM.object[[tissue]][["AGEX"]] <-  NULL
+} 
+
+
+```
+
+
+ 
+
+### Entire age range
+
+```{r}
+ageDF <- get_age_df(min_window_size=51,
+                    window_size=51)
+
+ageDF
+```
+
+```{r warning=F, message=F}
+# to get t-stat and p-value
+
+sharpLM.object.entireAgeRange <- list()
+options(error=recover)
+i=1
+
+for (tissue in names(GTEx.object )){
+  
+  print(paste0("Running ShARP-LM: ", tissue, " (",i,"/", length(names(GTEx.object)),")" ))
+  
+  sharpLM.object.entireAgeRange[[tissue]] <-  get_LM_adapted(GTExobj=GTEx.object, 
+                                                  tissue=tissue, 
+                                                  df_age_lims=ageDF)
+  
+  i=i+1
+} 
+```
+
+```{r}
+sex_specific_tissues <- c("Ovary","Uterus","Vagina","Prostate","Testis")
+
+for (tissue in sex_specific_tissues){
+  
+  sharpLM.object.entireAgeRange[[tissue]][["SEX"]] <-  NULL
+  sharpLM.object.entireAgeRange[[tissue]][["AGEX"]] <-  NULL
+} 
+
+```
+
+
+```{r warning=F, message=F}
+sharpLM.object.entireAgeRange_abline <- list()
+options(error=recover)
+i=1
+
+for (tissue in names(GTEx.object)){
+  
+  print(paste0("Running ShARP-LM: ", tissue, " (",i,"/", length(names(GTEx.object)),")" ))
+  
+  sharpLM.object.entireAgeRange_abline[[tissue]] <-  get_LM_adapted(GTExobj=GTEx.object, 
+                                                  tissue=tissue, 
+                                                  df_age_lims=ageDF)
+  
+  i=i+1
+} 
+```
+  
+
+ 
+ 
+# D. Gene Set Enrichment Analysis
+
+## Functions
+
+```{r}
+
+GSEAgetter <- function(sharpLM.obj, tissue){
+  GSEA.frame <- data.frame(pathway=NULL, padj=NULL, NES=NULL, age=NULL, tissue=NULL, variable=NULL)
+  sharpLM.obj_tissue <- sharpLM.obj[[tissue]]
+  reactome.gs <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:REACTOME")
+  
+  reactome.gsets <- reactome.gs %>% split(x = .$gene_symbol, f = .$gs_name)
+  
+  for (set in names(reactome.gsets)){
+    reactome.gsets[[set]] <- toupper(reactome.gsets[[set]])
+  }
+  
+  for (df in seq_along(sharpLM.obj_tissue)) {
+    # Print the name of the subobject itself
+    dfname <- names(sharpLM.obj_tissue)[df]
+    tstat.df <- sharpLM.obj_tissue[[df]][["t"]]
+    for (agerep in 1:(ncol(tstat.df)-1)){
+      col <- agerep+1
+      vectortool <- tstat.df[,col]
+      vectortool <- as.numeric(vectortool)
+      names(vectortool) <- tstat.df[,"gene"]
+      vectorranked <- sort(vectortool)
+      
+      print("Performing GSEA")
+      print(colnames(tstat.df)[col])
+      reactome.res <- fgsea(pathways = reactome.gsets, 
+                            stats = vectorranked)
+      
+      reactome.res.tidy <- reactome.res %>%
+        as_tibble() %>%
+        arrange(desc(NES))
+      
+      reactome.res.tidy %>% 
+        dplyr::select(-leadingEdge, -ES) %>% 
+        arrange(padj)
+      
+      
+      reactome.res.tidy <- reactome.res.tidy[,c(1,3,6)]
+      
+      reactome.res.tidy$age <- rep(colnames(tstat.df)[col], nrow(reactome.res.tidy))
+      reactome.res.tidy$tissue <- rep(tissue, nrow(reactome.res.tidy))
+      reactome.res.tidy$variable <- rep(dfname, nrow(reactome.res.tidy))
+      GSEA.frame <- rbind(GSEA.frame, reactome.res.tidy)
+    }
+  }
+  GSEA.frame$variable <- gsub("AGE", "Age", GSEA.frame$variable)
+  GSEA.frame$variable <- gsub("SEX", "Gender", GSEA.frame$variable)
+  GSEA.frame$variable <- gsub("AGEX", "Int_Age_Gender", GSEA.frame$variable)
+  
+  modifiedTissuename <- gsub("-", "_", tissue)
+  modifiedTissuename <- gsub(" ", "", modifiedTissuename)
+  modifiedTissuename <- gsub("\\(", "", modifiedTissuename)
+  modifiedTissuename <- gsub("\\)", "", modifiedTissuename)
+  
+  saveRDS(GSEA.frame, paste("AppData/DB_PeakEnrichment.db/",modifiedTissuename,".RDS", sep=""))
+}
+
+
+#GSEAgetter(sharpLM.object, "Testis")
+```
+
+
+
+```{r}
+formatClusterAffiliation <- function(pathway_data, DBtoAffiliate = "REACTOME", OtherDBs=c("KEGG","GO")){
+  # pathway_data is a data frame where the first column is the pathway and the second column is the number of the cluster
+   
+# Create a list of unique clusters
+unique_clusters <- unique(pathway_data[,2])
+
+# Initialize an empty list to store the results
+result_list <- list()
+
+# Iterate over each unique cluster
+for (cluster in unique_clusters) {
+  # Subset the data frame for the current cluster
+  subset_df <- pathway_data[pathway_data[,2] == cluster, ]
+  
+  # Split the subset into REACTOME and KEGG/GO pathways based on the Pathway column
+  DBtoAffiliate_pathways <- subset_df[grep(paste0("^",DBtoAffiliate), subset_df[,1]), 1]
+  OtherDBs_pathways <- subset_df[grep(paste0("^(",paste(OtherDBs,  collapse = "|"),")"), subset_df[,1]), 1]
+ 
+  # Store the pathways in a list for the current cluster
+  result_list[[as.character(cluster)]] <- list(
+     DBtoAffiliate_pathways,
+     OtherDBs_pathways
+  )
+  names(result_list[[as.character(cluster)]]) <- c(paste0(DBtoAffiliate,".pathways"),
+                                                   paste0(paste(OtherDBs, collapse="."),".pathways"))
+  
+}
+
+# Print the resulting list
+return(result_list)
+
+}
+```
+
+```{r}
+
+
+getAbsoluteParents <- function(pathway_data){
+  
+  
+  # define pathways that are both childs and parents
+  parentChild <- intersect(pathway_data$Parent,pathway_data$Child)
+  
+  # subset the data frame to only have the parents of these parents
+  pathway_data_subsetparents <- pathway_data[pathway_data$Child %in% parentChild,] 
+  colnames(pathway_data_subsetparents) <- c("Parent","parentchild")
+  # subset all pathways that have as a parent these parent/childs
+  pathway_data_subsetchilds <- pathway_data[pathway_data$Parent %in% parentChild,] 
+  colnames(pathway_data_subsetchilds) <- c("parentchild","Child")
+  
+  # attribute the correct parent 
+  pathway_data_subset <- merge(pathway_data_subsetparents, pathway_data_subsetchilds, by="parentchild")
+  pathway_data_subset$parentchild <- NULL
+  
+  # bind the new parents to the rest
+  pathway_data_absolute <- rbind(pathway_data_subset, pathway_data[!pathway_data$Parent %in% parentChild,  ])
+  return(pathway_data_absolute)
+  
+}
+
+getUltimateParents <- function(ParentChildRel){
+  ultimateParents <- getAbsoluteParents(ParentChildRel)
+  ultimateParentsnew <- getAbsoluteParents(ultimateParents)
+  i=1
+  while(!identical(ultimateParents, ultimateParentsnew)){
+    print(i)
+    ultimateParents <- ultimateParentsnew
+    ultimateParentsnew <- getAbsoluteParents(ultimateParentsnew)
+    
+    i=i+1
+  }
+  return(ultimateParentsnew)
+}
+
+getUltimateParents(parent_child_relationships)
+```
+
+```{r}
+# Sample data frame
+pathway_data <- data.frame(
+  Parent = c("Parent1", "Parent1", "Parent2", "Parent3", "Parent3", "Parent4", "Parent4"),
+  Child = c("ChildA", "ChildB", "Parent1", "ChildC", "Parent2", "Parent3", "ChildD")
+)
+
+pathway_data 
+getUltimateParents(pathway_data)
+
+```
+
+## Families of Pathways
+
+
+```{r}
+reactome.gs <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:REACTOME")
+reactome.gsets <- reactome.gs %>% split(x = .$gene_symbol, f = .$gs_name)
+kegg.gs <- msigdbr(species = "Homo sapiens", category = "C2", subcategory = "CP:KEGG")
+kegg.gsets <- kegg.gs %>% split(x = .$gene_symbol, f = .$gs_name)
+bp.gs <- msigdbr(species = "Homo sapiens", category = "C5", subcategory = "GO:BP")
+bp.gsets <- bp.gs %>% split(x = .$gene_symbol, f = .$gs_name)
+
+pathways <- append(reactome.gsets, kegg.gsets)
+pathways <- append(pathways, bp.gsets)
+ordered_pathways <- pathways[order(sapply(pathways, length))]
+ 
+
+# Create an empty data frame to store parent-child relationships
+parent_child_relationships <- data.frame(
+  Parent = character(0),
+  Child = character(0)
+)
+
+# Find pathways that are subsets of others and store parent-child relationships
+
+subset_indices <- numeric(length(ordered_pathways))
+for (i in 1:length(ordered_pathways)) {
+  for (j in 1:length(ordered_pathways)) {
+    if (i != j && all(ordered_pathways[[i]] %in% ordered_pathways[[j]])) {
+      subset_indices[i] <- 1
+      parent_child_relationships <- rbind(
+        parent_child_relationships,
+        data.frame(Parent = names(ordered_pathways)[j], Child = names(ordered_pathways)[i])
+      )
+      break
+    }
+  }
+}
+parent_child_relationships_absoluteparent <- getUltimateParents(parent_child_relationships)  
+
+
+extrapaths <- parent_child_relationships_absoluteparent[which(parent_child_relationships_absoluteparent$Parent==parent_child_relationships_absoluteparent$Child),2]
+
+extrapathways <- ordered_pathways[extrapaths] #pathways which have the same genes, albeit different names
+# Remove subsets of others
+filtered_pathways <- ordered_pathways[subset_indices == 0]
+filtered_pathways <- c(filtered_pathways, extrapathways)
+
+ 
+
+# Calculate overlap indices between all pairs of sets using the minimum set size
+overlap_indices <- matrix(0, ncol = length(filtered_pathways), nrow = length(filtered_pathways))
+rownames(overlap_indices) <- colnames(overlap_indices) <- names(filtered_pathways)
+
+for (i in 1:length(filtered_pathways)) {
+  for (j in 1:length(filtered_pathways)) {
+    set1 <- filtered_pathways[[i]]
+    set2 <- filtered_pathways[[j]]
+    intersection_size <- length(intersect(set1, set2))
+    min_set_size <- min(length(set1), length(set2))
+    overlap_indices[i, j] <- intersection_size / min_set_size
+  }
+}
+
+# Print the overlap indices matrix
+
+tiago <- cor(overlap_indices, method="spearman")
+
+
+heatmap(cor(overlap_indices, method="spearman"), symm=T, labRow = colnames(overlap_indices), labCol = overlap_indices)
+  
+pheatmap(tiago, show_rownames = F, show_colnames = F,cutree_cols = 9, color=colorRampPalette(c("#53A2BE", "white", "#BA3B46"))(100))
+ 
+
+my_hclust_gene <- hclust(dist(tiago), method = "complete")
+
+ clusters <- cutree(my_hclust_gene, k = 10)
+ # Convert cluster assignments to a data frame
+cluster_df <- data.frame(
+  Sample = rownames(tiago),
+  Cluster = clusters, row.names = NULL
+)
+cluster_df
+ 
+as.dendrogram(my_hclust_gene) %>%
+  plot(horiz = TRUE)
+
+colnames(cluster_df)[1] <- "Parent"
+
+wearefamily <- merge(cluster_df, parent_child_relationships_absoluteparent, by="Parent")
+fams <- wearefamily[,c(3,2)]
+colnames(fams)[1] <- "Parent"
+
+pathwayfams <- rbind(cluster_df, fams)
+pathwayfams <- distinct(pathwayfams)
+
+```
+
+
+### Format and save
+
+```{r}
+Pathway_appData <- formatClusterAffiliation(pathwayfams)
+saveRDS(Pathway_appData, "AppData/Reactome_cluster_Affiliation.RDS")
+```
+
+
+```{r}
+ReactomeClusters <-  pathwayfams[grep("^REACTOME", pathwayfams[,1]), ]
+colnames(ReactomeClusters) <- c("pathways","cluster")
+saveRDS(ReactomeClusters, "AppData/Cluster_Reactome.RDS")
+
+```
+
+# E. Gene co-expression modules (WGCNA)
+ 
+## Functions
+
+### Get modules
+
+```{r fig.width=10, fig.height=4}
+
+
+getCorrMatrix <- function(GTExobj, tissue, mincorr=0.7, minvar=1){
+  
+  logCPM <- GTExobj[[tissue]]$logCPM
+  
+  
+  # Define correlation matrix gene vs gene
+  corrgene <- cor(t(logCPM), method="pearson") 
+  
+  vargene <- as.vector(apply(logCPM, 1, var))
+  names(vargene) <- row.names(logCPM)
+  vargene <- data.frame(gene=names(vargene),
+                        var=vargene)
+  
+  aux <- abs(corrgene)
+  for (i in c(1:nrow(aux))){ 
+    aux[i,i] <- 0
+  } 
+  maxcorrgene <- apply(aux,1,max)
+  maxcorrgene <- data.frame(gene=names(maxcorrgene),
+                            corr=maxcorrgene)
+  
+  data_to_plot <- merge(maxcorrgene,vargene, by="gene")
+  
+  data_to_plot_subset <- data_to_plot[data_to_plot$corr>=mincorr & data_to_plot$var > minvar,]
+  print(ggplot(data_to_plot, mapping = aes(x=corr, y=var)) + 
+    geom_point(color="gray30") + 
+    theme_bw() +
+    xlab("|Pearson's correlation|") +
+    ylab("Variance") +
+    geom_point(data=data_to_plot_subset, mapping = aes(x=corr, y=var), color="red") +
+    #annotate(as.character(nrow(data_to_plot_subset)))
+    annotate("text", x = 0.9, y = 17.5, label = nrow(data_to_plot_subset), color="red", size=5)+
+    ggtitle(paste0("Genes to keep for module definition - ", tissue)) +
+    theme(axis.text.x = element_text(angle = 70, hjust=1),
+          plot.title = element_text(hjust = 0.5 ),
+          plot.subtitle = element_text(hjust = 0.5),
+          legend.position="top"))
+  
+  genes_to_keep <- data_to_plot_subset$gene
+  
+  corr_subset <- as.data.frame(corrgene[genes_to_keep,genes_to_keep])
+  
+  print(pheatmap(as.matrix(corr_subset),  show_colnames = F, show_rownames = F ,main=paste0("Genes to keep for module definition - ", tissue)))
+  
+  return(genes_to_keep)
+
+}
+
+
+
+
+getPower <- function(GTExobj, tissue, thresh_vargenes,genes_to_keep){
+  
+  # thresh_vargenes should be a named vector of thresholds of variables genes to keep for each tissue to consider
+  
+  if(!tissue %in% names(thresh_vargenes)){
+    stop("The given tissue is not supported")
+  }
+
+  
+  logCPM <- GTExobj[[tissue]]$logCPM[genes_to_keep,]
+  var <- apply(logCPM, 1, var)
+  
+  
+  
+  plots <- list()
+  
+  for (thresh in thresh_vargenes[[tissue]]){
+    print(paste("Processing threshold:", thresh))
+    
+    # Open a PDF device to send the plot to
+    pdf(file="/dev/null")
+  
+    ngenes_to_keep <- round(nrow(logCPM)*thresh)
+    genes_to_keep <- names(sort(var,decreasing = T))[1:ngenes_to_keep]
+    logCPM_subset <- logCPM[genes_to_keep,]
+    
+    # define soft threshold 
+    # https://ramellose.github.io/networktutorials/wgcna.html
+    powers <-  c(c(1:10),seq(from = 11, to=100, by=2))
+    sft <-  pickSoftThreshold(logCPM_subset, powerVector = powers, verbose = 5)$fitIndices
+    
+    plt1 <- ggplot(sft, aes(Power,-sign(slope)*SFT.R.sq, label=Power)) +
+      geom_point() +
+      geom_text(nudge_y = 0.05, size=2) +
+      geom_hline(yintercept = 0.8, color='red')+
+      xlab("Power") + ylab("R^2") + 
+      theme_bw() 
+    
+    plt2 <- ggplot(sft, aes(Power,mean.k., label=Power)) +
+      geom_point() +
+      geom_text(nudge_y = 7, size=2) + 
+      xlab("Power") + ylab("Mean connectivity") + 
+      theme_bw()  
+    
+    # Close the PDF device
+    dev.off()
+    
+    print(grid.arrange(plt1,plt2,top = text_grob(paste0(tissue," - var threshold: ",thresh), size = 14), ncol=2))
+    
+    
+  }
+  
+} 
+
+filterVar <-  function(GTExobj, tissue, thresh_var){
+  
+  # prepare logCPMs for WGCNA ----------------------------------------------------
+  
+  logCPM <- GTExobj[[tissue]]$logCPM
+  
+  # Filter genes with low variance 
+  vargene <- as.vector(apply(logCPM, 1, var))
+  names(vargene) <- row.names(logCPM)
+  vargene <- data.frame(gene=names(vargene),
+                        var=vargene)
+  
+  # visualize distribution of variance
+  print(ggplot(vargene) +
+    geom_histogram(aes(x=var), binwidth = 0.01) +
+    theme_bw() +
+    xlim(c(0,2)) +
+    geom_vline(xintercept = thresh_var, linetype="dashed", color="red") +
+    ggtitle(paste0("Gene variance - ", tissue))+
+    annotate("text", x = 1, y = 900, label = nrow(vargene[vargene$var>thresh_var,]), color="red", size=5)+
+      xlab("variance") +
+      ylab("frequency"))
+  
+  # Filter genes with low variance  
+  genes_to_keep <- vargene[vargene$var>thresh_var,"gene"]
+  
+  return(genes_to_keep)
+  
+}
+
+ pickBeta <- function(GTExobj, tissue, genes_to_keep, beta){
+   
+   logCPM <- GTExobj[[tissue]]$logCPM[genes_to_keep,]
+   
+     # When you have a lot of genes use the following code
+  k=softConnectivity(datE=t(logCPM),power=beta)
+  # Plot a histogram of k and a scale free topology plot
+  sizeGrWindow(10,5)
+  par(mfrow=c(1,2))
+  hist(k)
+  scaleFreePlot(k, main="Check scale free topology\n")
+  
+ }
+
+getDissimilarityMatrix <- function(GTExobj, tissue, genes_to_keep,beta=12, type="signed"){
+  
+  logCPM <- GTExobj[[tissue]]$logCPM[genes_to_keep,]
+  
+  # Calculate the Pearson correlation matrix
+  #cor_matrix <- cor(t(logCPM), method="pearson")
+  
+  # Transform the correlation matrix to get the adjacency values. 
+  #adjacency_matrix <- abs(cor_matrix)^beta
+  
+  if(type=="unsigned"){
+    ADJ <- abs(bicor(logCPM))^beta
+  } else if(type=="signed"){
+    ADJ <- (0.5 * (1+bicor(t(logCPM))))^beta
+  }
+  
+  TOM <- TOMsimilarity(ADJ)
+  
+  # https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/Tutorials/FemaleLiver-02-networkConstr-man.pdf
+  dissimilarity <- 1 - TOM 
+  
+  
+  return(dissimilarity)
+  
+}
+
+
+getModules <- function(disMatrix, height, mingenes, GTEx.obj, tissue, genes_to_keep, plot=T, verbose=T, static=T){
+  
+ logCPM <- GTEx.obj[[tissue]]$logCPM[genes_to_keep,]
+  # geneTree <-  hclust(as.dist(disMatrix), method = "average") 
+  # dynamicMods <-  cutreeDynamic(dendro = geneTree, distM = disMatrix,
+  #                               minClusterSize = mingenes, cutHeight=height, verbose=0)
+  # 
+   hierTOM <-  hclust(as.dist(disMatrix),method="average")
+    # The reader should vary the height cut-off parameter h1
+    # (related to the y-axis of dendrogram) in the following 
+   
+   if (static){
+     Colors <-  as.character(cutreeStaticColor(hierTOM, cutHeight=height, minSize=mingenes))
+   } else {
+      Colors <-  labels2colors(cutreeDynamic(hierTOM,method="tree"))
+   }
+    
+    
+   
+  # Convert numeric lables into colors
+   #Colors <- labels2colors(Colors) 
+  
+    
+   eigengenes <- moduleEigengenes(expr=t(logCPM), colors=Colors)$eigengenes
+  
+  
+  if(plot){
+    
+    # Now we plot the results
+    plotDendroAndColors(hierTOM,
+                 colors=data.frame(Colors),
+                 dendroLabels = FALSE, marAll = c(1, 8, 3, 1),
+                 main = paste0("Gene dendrogram and module colors, TOM dissimilarity | ", "mingenes: ", mingenes,"; height: ", height))
+    
+  }
+  
+  
+  Colors <- paste0("ME",Colors)
+  names(Colors) <- rownames(logCPM)
+
+  allGenes <- names(Colors)
+  
+  # Split gene names by their module colors
+  moduleLists <- split(names(Colors), Colors)
+  
+  # Convert each vector of genes to a factor with levels being all possible genes
+  moduleLists <- lapply(moduleLists, function(genes) {
+    factor(genes, levels = allGenes)
+  })
+
+  
+  if(verbose){
+    print(paste0("You have found ", length(table(Colors))-1, " modules."))
+  }
+  # grey corresponds to the unassigned genes
+  if ("MEgrey" %in% names(moduleLists)){
+    moduleLists[["MEgrey"]] <- NULL
+  }
+  
+  return(list(modules=moduleLists,
+              eigengenes=eigengenes))
+  
+}
+ 
+
+
+formatEigengenes <- function(eigengeneObjList, GTExobj){
+  # list where each entry is the name of the tissue,each entry is the output from getmodules$eigengenes
+  
+  eigengeneDFall <- data.frame(NULL)
+  
+  for (tissue in names(eigengeneObjList)){
+    meta <- GTExobj[[tissue]]$metadata[,c("SAMPID","AGE","SEX")]
+    colnames(meta) <- c("samp_id","age","sex")
+    eigengenes <- eigengeneObjList[[tissue]]
+    eigengenes$samp_id <- row.names(eigengenes)
+    eigengenes <- melt(eigengenes)
+    colnames(eigengenes) <- c("samp_id","module","value")
+    eigengenes$tissue <-  rep(tissue, nrow(eigengenes))
+    
+    eigengenes <- merge(eigengenes, meta, by="samp_id")
+    eigengenes$module <- as.character(eigengenes$module)
+    eigengenes$samp_id <- factor(eigengenes$samp_id)
+    
+    eigengeneDFall <- rbind(eigengeneDFall,eigengenes)
+    
+  }
+  
+  eigengeneDFall <- as.data.frame(eigengeneDFall)
+  colnames(eigengeneDFall) <- c("samp_id","module","value","tissue","age","sex")
+  
+  
+  return(eigengeneDFall)
+}
+  
+
+```
+
+
+### Cell Type Enrichment
+
+```{r}
+ 
+GetEnrichment <- function(signature_genes, other_genes, module_genes){
+   
+  # signature_genes: set of genes that define a given cell type
+  # other_genes: set of genes that define other cell types of interest
+  # module_genes: set of genes of a given module of co-regulation
+  
+  
+  # Contingency table
+  # contingency_table_wrongmaybe <- matrix(
+  #   c( sum(module_genes %in% signature_genes), sum(module_genes %in% other_genes),
+  #     sum(!(module_genes %in% signature_genes)), sum(!(module_genes %in% other_genes))),
+  #   ncol = 2,
+  #   dimnames = list(c("Signature", "Other"), c("Present", "Absent"))
+  # )
+
+
+  # Create the contingency table
+contingency_table <- matrix(c(
+  length(intersect(module_genes, signature_genes)),  # Genes in module and signature
+  length(setdiff(module_genes, signature_genes)),    # Genes in module but not in signature
+  length(setdiff(signature_genes, module_genes)),    # Genes in signature but not in module
+  length(intersect(setdiff(other_genes, module_genes), 
+                   setdiff(other_genes, signature_genes))) # Genes in neither
+), nrow=2)
+
+  # add small value so that the OR is never Inf
+  #contingency_table <- contingency_table+0.6
+
+  # Fisher's exact test
+  fisher_result <- fisher.test(contingency_table)
+  
+  # Extract the p-value
+  value <- -log10(fisher_result$p.value)
+  # to avoid negative values due to r's way of handling floats
+  tolerance <- 1e-10 
+  value[abs(value) < tolerance] <- 0
+
+
+
+  OR <- fisher_result$estimate
+  
+  results <- c(OR, value)
+  names(results) <- c("oddsRatio","value")
+  
+  # Print the p-value
+  return(results)
+  
+}
+
+
+getEnrichment_perTissue_perReference <- function(moduleObj,SigGenes_Obj, tissue, reference, genes_to_keep ){
+  
+  # modubeObj: a list where each entry is the name of the module, and each module has a vector of genes. output from getModules
+  # tissue
+  # SigGenes_Obj: an object of gene signatures for each tissue
+  #       |
+  #       |__ tissue
+  #               |
+  #               |__ reference
+  #                       |
+  #                       |_ cell_type
+  # reference: the enrichment will be done for each reference
+  
+  enrichmentCellType <- data.frame(NULL)
+  
+  for (module in names(moduleObj)){
+    
+    module_genes <- moduleObj[[module]]
+    
+    enrichment_module <- data.frame(NULL)
+    
+    for (celltype in names(SigGenes_Obj[[tissue]][[reference]])){
+      
+      #other_genes <- SigGenes_Obj[[tissue]][[reference]] 
+      # Exclude the celltype in the iteration
+      #other_genes[[celltype]] <- NULL 
+      
+      # Combine the signatures of all cell types except the one in the iteration, and extract unique values
+      #other_genes <- unique(unlist(other_genes))
+      #other_genes <- other_genes[other_genes %in% genes_to_keep]
+      other_genes <- genes_to_keep
+      
+      # Get signature of the cell type of the iteration
+      signature_genes <- SigGenes_Obj[[tissue]][[reference]][[celltype]]
+      signature_genes <- signature_genes[signature_genes %in% genes_to_keep]
+      signature_genes <- unique(signature_genes)
+      
+      fisher <- GetEnrichment(signature_genes=signature_genes, 
+                              other_genes=other_genes, 
+                              module_genes=module_genes)
+      
+      enrichment_module_aux <- c(module, celltype, fisher["value"], tissue, reference, fisher["oddsRatio"] )
+      
+      
+      
+      enrichment_module <- rbind(enrichment_module, enrichment_module_aux)
+      
+    }
+    
+    colnames(enrichment_module) <- c("module","cellType", "value","tissue","reference","oddsRatio")
+    enrichmentCellType <- rbind(enrichmentCellType, enrichment_module)
+    
+  }
+  
+  enrichmentCellType <- as.data.frame(enrichmentCellType)
+  colnames(enrichmentCellType) <- c("module","cellType", "value","tissue","reference","oddsRatio")
+  
+  enrichmentCellType$value[enrichmentCellType$value == Inf] <- 0
+  enrichmentCellType$value <- as.numeric(enrichmentCellType$value)
+  enrichmentCellType$oddsRatio <- as.numeric(enrichmentCellType$oddsRatio)
+  
+  return(enrichmentCellType)
+}
+
+
+visualizeEnrichment <- function(moduleObj,SigGenes_Obj, tissue, reference, mingenes, height, genes_to_keep ){
+  
+    
+  # modubeObj: a list where each entry is the name of the module, and each module has a vector of genes. output from getModules
+  # tissue
+  # SigGenes_Obj: an object of gene signatures for each tissue
+  #       |
+  #       |__ tissue
+  #               |
+  #               |__ reference
+  #                       |
+  #                       |_ cell_type
+  # reference: the enrichment will be done for each reference
+  
+  
+  enrichmentDF <- getEnrichment_perTissue_perReference(moduleObj=moduleObj,
+                                                       SigGenes_Obj=SigGenes_Obj, 
+                                                       tissue=tissue, 
+                                                       reference=reference,
+                                                       genes_to_keep=genes_to_keep)
+   
+  enrichmentDF$oddsRatio[enrichmentDF$oddsRatio==Inf] <- max(enrichmentDF$oddsRatio[is.finite(enrichmentDF$oddsRatio)])+100
+  # Create the heatmap
+  heatmap <- ggplot(enrichmentDF, aes(x=cellType, y=module)) + 
+    geom_tile(aes(fill=oddsRatio), colour="white") + 
+    geom_text(aes(label=ifelse(value >= -log10(0.05) & oddsRatio>1, sprintf("%.2f", oddsRatio), NA)), vjust=0.5, size=3) +  # Added ifelse condition here
+    scale_fill_gradient2(name="OR", low="darkseagreen4",  high="white", trans="reverse") +  
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 45, hjust=1)) +
+    ggtitle(paste0("Cell type markers from ", reference), subtitle = paste0("mingenes: ", mingenes,"; height: ", height))+ 
+    theme(axis.line = element_line(colour = "black"),
+          panel.grid.minor = element_blank(),
+          panel.border = element_blank(),
+          panel.background = element_blank(),
+          axis.text.x = element_text(angle = 45, hjust=1),
+          plot.title = element_text(hjust = 0.5),
+          plot.subtitle = element_text(hjust = 0.5)) +
+    xlab("Cell type") +
+    ylab("Modules")
+
+  
+  print(heatmap)
+  
+}
+
+
+
+
+getEnrichment_all <- function(moduleObjlist,SigGenes_Obj, genes_to_keepList){
+  
+  #modubeObjlist: list where each entry is a moduleObj (output from getModules) for a given tissue (named)
+  # SigGenes_Obj: an object of gene signatures for each tissue
+  #       |
+  #       |__ tissue
+  #               |
+  #               |__ reference
+  #                       |
+  #                       |_ cell_type
+  
+  results <- data.frame(NULL)
+  for (tissue in names(moduleObjlist)){
+    for (reference in names(SigGenes_Obj[[tissue]])){
+      results_aux <- getEnrichment_perTissue_perReference(moduleObjlist[[tissue]],SigGenes_Obj, tissue, reference, genes_to_keepList[[tissue]] )
+      results <- rbind(results, results_aux )
+    }
+  }
+  results <- as.data.frame(results)
+  colnames(results) <- c("module","cellType", "value","tissue","reference","oddsRatio")
+  
+  return(results)
+}
+
+
+
+```
+
+### Get sources
+
+A list of the used references for the cell type signatures is provided bellow.
+
+```{r}
+
+getSources <- function(){
+  
+  
+  musc_skel <- c("Rubenstein", "<a href = 'https://pubmed.ncbi.nlm.nih.gov/31937892/' target = '_blank'> Link </a>", "Muscle - Skeletal")
+  wblood_1 <- c("Hay", "<a href = 'https://pubmed.ncbi.nlm.nih.gov/30243574/' target = '_blank'> Link </a>", "Whole Blood")
+  wblood_2 <- c("LM22", "<a href = 'https://pubmed.ncbi.nlm.nih.gov/25822800/' target = '_blank'> Link </a>", "Whole Blood")
+ heart_1 <- c("Cui", "<a href = 'https://pubmed.ncbi.nlm.nih.gov/30759401/' target = '_blank'> Link </a>", "Heart - Left Ventricle")
+  heart_2 <- c("Descartes", "<a href = 'https://pubmed.ncbi.nlm.nih.gov/33184181/' target = '_blank'> Link </a>", "Heart - Left Ventricle")
+  cortx_1 <- c("Fan", "<a href = 'https://pubmed.ncbi.nlm.nih.gov/29867213/' target = '_blank'> Link </a>", "Brain - Cortex")
+  cortx_2 <- c("Descartes", "<a href = 'https://pubmed.ncbi.nlm.nih.gov/33184181/' target = '_blank'> Link </a>", "Brain - Cortex")
+  
+  sources <- rbind(musc_skel, wblood_1,wblood_2, heart_1, heart_2, cortx_1, cortx_2)
+  row.names(sources) <- NULL
+  colnames(sources) <- c("reference", "article", "tissue")
+  
+  return(sources)
+  
+  
+}
+
+ 
+```
+
+
+
+
+## Cell signatures
+
+SigGenes_Obj
+  |
+  |__ tissue
+        |
+        |__ SignatureID_1
+        |          |
+        |          |__ CellType1 (vector of genes)
+        |          |__ CellType2 (vector of genes)
+        |          |__ CellType3 (vector of genes)
+        |          |__ CellType4 (vector of genes) 
+        |__ SignatureID_2
+                  |
+                  |__ CellType1 (vector of genes)
+                  |__ CellType2 (vector of genes)
+                  |__ CellType3 (vector of genes)
+                  |__ CellType4 (vector of genes) 
+                  
+
+```{r}
+SigGenes_Obj <- readRDS("auxiliary_files/SigGenes_Obj.RDS")
+```
+
+
+```{r}
+LM22_df <- as.data.frame(fread("auxiliary_files/LM22_signature_WholeBlood.csv"))
+row.names(LM22_df) <- LM22_df$`22 leukocyte subsets & activation states`
+LM22_df$`22 leukocyte subsets & activation states` <- NULL
+
+# Convert the data frame to a list
+LM22 <- lapply(1:ncol(LM22_df), function(i) {
+  genes <- rownames(LM22_df)[LM22_df[, i] == 1]
+  return(genes)
+})
+names(LM22) <- colnames(LM22_df)
+
+SigGenes_Obj$`Whole Blood`$LM22 <- LM22
+```
+
+
+## Module definition
+
+
+### Brain - Cortex
+ 
+ 
+```{r}
+# The minimum number of genes should be greater than 5000 for this type of analysis, as advised in  the WGCNA tutorial
+# https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/Tutorials/Simulated-05-NetworkConstruction.pdf
+genes_to_keep_BC <- filterVar(GTExobj=GTEx.object, tissue="Brain - Cortex", thresh_var=0.5)
+print(paste0("Genes to keep: ",length(genes_to_keep_BC)))
+# beta = 12 is advised in the WGCNA FAQs for signed networks
+# https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/faq.html
+pickBeta(GTExobj=GTEx.object, tissue="Brain - Cortex", genes_to_keep=genes_to_keep_BC, beta=12)
+# to get more biologically relevant results, signed networks are advised. We are using bicor instead of cor, as also advised for WGCNA using RNA-seq data
+# https://academic.oup.com/bib/article/19/4/575/2888441
+# Similar analysis reported in the WGCNA tutorial were performed. From those analysis, calculating the dissimilarity matrix using TOM was the one giving more meaningful results
+TOMdis_BC <- getDissimilarityMatrix(GTExobj=GTEx.object, tissue="Brain - Cortex", genes_to_keep=genes_to_keep_BC, beta=12, type="signed")
+ 
+```
+
+```{r}
+ 
+# Exploratory analysis to choose mingenes and min height
+for (mingenes in seq(10,50,5)) {
+  for (height in seq(0.9,1,0.01)){
+    
+    print(paste0("Mingenes: ", mingenes,"; height: ", height))
+    
+    # Static TOM was chosen for this part, as it gave modules more coherent with was observed in the dendogram
+    # "grey" module is removed, as it contains the unassigned genes. Eases visualization
+    modules_BC <- getModules(TOMdis_BC, height=height, mingenes=mingenes, GTEx.obj=GTEx.object, tissue = "Brain - Cortex",genes_to_keep=genes_to_keep_BC, plot=T, verbose=T)$modules
+    
+    lapply(modules_BC, length)
+    
+    visualizeEnrichment(moduleObj = modules_BC,
+                    SigGenes_Obj = SigGenes_Obj, 
+                    tissue = "Brain - Cortex", 
+                    reference = "Descartes", mingenes=mingenes, height=height,genes_to_keep=genes_to_keep_BC)
+     
+  }
+}
+```
+```{r fig.width=10, fig.height=5}
+ 
+# Exploratory analysis to choose mingenes and min height
+for (mingenes in seq(10,50,5)) {
+  for (height in seq(0.9,1,0.01)){
+    
+    print(paste0("Mingenes: ", mingenes,"; height: ", height))
+    
+    # Static TOM was chosen for this part, as it gave modules more coherent with was observed in the dendogram
+    # "grey" module is removed, as it contains the unassigned genes. Eases visualization
+    modules_BC <- getModules(TOMdis_BC, height=height, mingenes=mingenes, GTEx.obj=GTEx.object, tissue = "Brain - Cortex",genes_to_keep=genes_to_keep_BC, plot=T, verbose=T)$modules
+    
+    lapply(modulesBC, length)
+    
+    visualizeEnrichment(moduleObj = modules_BC,
+                    SigGenes_Obj = SigGenes_Obj, 
+                    tissue = "Brain - Cortex", 
+                    reference = "Fan", mingenes=mingenes, height=height,genes_to_keep=genes_to_keep_BC)
+     
+  }
+}
+```
+ 
+ 
+ 
+```{r fig.width=12, fig.height=6}
+genes_to_keep_BC <- filterVar(GTExobj=GTEx.object, tissue="Brain - Cortex", thresh_var=0.5)
+# Choosing the parameters that better fit this tissue
+mingenes <- 15
+height <- 0.95
+modulesBC <- getModules(TOMdis_BC, height=height, mingenes=mingenes, GTEx.obj=GTEx.object, tissue = "Brain - Cortex",genes_to_keep=genes_to_keep_BC, plot=T, verbose=T) 
+
+visualizeEnrichment(moduleObj = modulesBC$modules,
+                    SigGenes_Obj = SigGenes_Obj, 
+                    tissue = "Brain - Cortex", 
+                    reference = "Fan", mingenes=mingenes, height=height,genes_to_keep=genes_to_keep_BC)
+
+visualizeEnrichment(moduleObj = modulesBC$modules,
+                    SigGenes_Obj = SigGenes_Obj, 
+                    tissue = "Brain - Cortex", 
+                    reference = "Descartes", mingenes=mingenes, height=height,genes_to_keep=genes_to_keep_BC)
+
+eigengenesBC <- modulesBC$eigengenes
+eigengenesBC <- eigengenesBC[,colnames(eigengenesBC)!="MEgrey"]
+modulesBC <- modulesBC$modules
+
+```
+ 
+ 
+ 
+ 
+```{r}
+eigengenesBC_aux <- eigengenesBC
+eigengenesBC_aux$SAMPID <- row.names(eigengenesBC_aux)
+eigengenesBC_aux <- merge(GTEx.object[["Brain - Cortex"]]$metadata[,c("SAMPID","AGE")], eigengenesBC_aux, by="SAMPID")
+
+for (i in c(3:ncol(eigengenesBC_aux))){
+  moduledata <- eigengenesBC_aux[,c(1,2,i)]
+  print(ggplot(moduledata, aes(x=AGE, y=get(colnames(moduledata)[3])))+
+    geom_point()+ geom_smooth()+
+      ggtitle(colnames(moduledata)[3]))
+}
+
+```
+ 
+ 
+### Skeletal Muscle
+ 
+```{r}
+# The minimum number of genes should be greater than 5000 for this type of analysis, as advised in  the WGCNA tutorial
+# https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/Tutorials/Simulated-05-NetworkConstruction.pdf
+genes_to_keep_MS <- filterVar(GTExobj=GTEx.object, tissue="Muscle - Skeletal", thresh_var=0.4)
+print(paste0("Genes to keep: ",length(genes_to_keep_MS)))
+# beta = 12 is advised in the WGCNA FAQs for signed networks
+# https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/faq.html
+pickBeta(GTExobj=GTEx.object, tissue="Muscle - Skeletal", genes_to_keep=genes_to_keep_MS, beta=12)
+# to get more biologically relevant results, signed networks are advised. We are using bicor instead of cor, as also advised for WGCNA using RNA-seq data
+# https://academic.oup.com/bib/article/19/4/575/2888441
+# Similar analysis reported in the WGCNA tutorial were performed. From those analysis, calculating the dissimilarity matrix using TOM was the one giving more meaningful results
+TOMdis_MS <- getDissimilarityMatrix(GTExobj=GTEx.object, tissue="Muscle - Skeletal", genes_to_keep=genes_to_keep_MS, beta=12, type="signed")
+ 
+```
+```{r}
+
+# Exploratory analysis to choose mingenes and min height
+for (mingenes in seq(15,30,5)) {
+  for (height in seq(0.9,1,0.01)){
+    
+    print(paste0("Mingenes: ", mingenes,"; height: ", height))
+    
+    # Static TOM was chosen for this part, as it gave modules more coherent with was observed in the dendogram
+    # "grey" module is removed, as it contains the unassigned genes. Eases visualization
+    modules_MS <- getModules(TOMdis_MS, height=height, mingenes=mingenes, GTEx.obj=GTEx.object, tissue = "Muscle - Skeletal",genes_to_keep=genes_to_keep_MS, plot=T, verbose=T)$modules
+    
+    lapply(modules_MS, length)
+    
+    visualizeEnrichment(moduleObj = modules_MS,
+                    SigGenes_Obj = SigGenes_Obj, 
+                    tissue = "Muscle - Skeletal", 
+                    reference = "Rubenstein", mingenes=mingenes, height=height,genes_to_keep=genes_to_keep_MS)
+     
+  }
+}
+```
+ 
+ 
+ 
+```{r}
+# Choosing the parameters that better fit this tissue
+#mingenes <- 
+#height <- 
+#modulesMS <- getModules(TOMdis_MS, height=height, mingenes=mingenes, GTEx.obj=GTEx.object, tissue = "Muscle - Skeletal",genes_to_keep=genes_to_keep, plot=T, verbose=T)
+```
+ 
+ 
+ 
+```{r fig.width=12, fig.height=6}
+genes_to_keep_MS <- filterVar(GTExobj=GTEx.object, tissue="Muscle - Skeletal", thresh_var=0.4)
+# Choosing the parameters that better fit this tissue
+mingenes <- 20
+height <- 0.98
+modulesMS <- getModules(TOMdis_MS, height=height, mingenes=mingenes, GTEx.obj=GTEx.object, tissue = "Muscle - Skeletal",genes_to_keep=genes_to_keep_MS, plot=T, verbose=T) 
+
+visualizeEnrichment(moduleObj = modulesMS$modules,
+                    SigGenes_Obj = SigGenes_Obj, 
+                    tissue = "Muscle - Skeletal", 
+                    reference = "Rubenstein", mingenes=mingenes, height=height,genes_to_keep=genes_to_keep_MS)
+ 
+
+eigengenesMS <- modulesMS$eigengenes
+eigengenesMS <- eigengenesMS[,colnames(eigengenesMS)!="MEgrey"]
+eigengenesMS <- eigengenesMS[,colnames(eigengenesMS)!="MEblack"] # because it only contains pseudogenes and we don't get enrichment for diseases
+modulesMS <- modulesMS$modules
+modulesMS <- modulesMS[names(modulesMS)!="MEblack"]
+```
+ 
+```{r}
+eigengenesMS_aux <- eigengenesMS
+eigengenesMS_aux$SAMPID <- row.names(eigengenesMS_aux)
+eigengenesMS_aux <- merge(GTEx.object[["Muscle - Skeletal"]]$metadata[,c("SAMPID","AGE")], eigengenesMS_aux, by="SAMPID")
+
+for (i in c(3:ncol(eigengenesMS_aux))){
+  moduledata <- eigengenesMS_aux[,c(1,2,i)]
+  print(ggplot(moduledata, aes(x=AGE, y=get(colnames(moduledata)[3])))+
+    geom_point()+ geom_smooth()+
+      ggtitle(colnames(moduledata)[3]))
+}
+
+```
+
+### Left cardiac ventricle
+ 
+```{r}
+# The minimum number of genes should be greater than 5000 for this type of analysis, as advised in  the WGCNA tutorial
+# https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/Tutorials/Simulated-05-NetworkConstruction.pdf
+genes_to_keep_HLV <- filterVar(GTExobj=GTEx.object, tissue="Heart - Left Ventricle", thresh_var=.35)
+print(paste0("Genes to keep: ",length(genes_to_keep_HLV)))
+# beta = 12 is advised in the WGCNA FAQs for signed networks
+# https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/faq.html
+pickBeta(GTExobj=GTEx.object, tissue="Heart - Left Ventricle", genes_to_keep=genes_to_keep_HLV, beta=12)
+# to get more biologically relevant results, signed networks are advised. We are using bicor instead of cor, as also advised for WGCNA using RNA-seq data
+# https://academic.oup.com/bib/article/19/4/575/2888441
+# Similar analysis reported in the WGCNA tutorial were performed. From those analysis, calculating the dissimilarity matrix using TOM was the one giving more meaningful results
+TOMdis_HLV <- getDissimilarityMatrix(GTExobj=GTEx.object, tissue="Heart - Left Ventricle", genes_to_keep=genes_to_keep_HLV, beta=12, type="signed")
+ 
+```
+
+
+
+
+
+
+```{r}
+
+# Exploratory analysis to choose mingenes and min height
+for (mingenes in seq(25,50,5)) {
+  for (height in seq(0.9,1,0.01)){
+    
+    print(paste0("Mingenes: ", mingenes,"; height: ", height))
+    
+    # Static TOM was chosen for this part, as it gave modules more coherent with was observed in the dendogram
+    # "grey" module is removed, as it contains the unassigned genes. Eases visualization
+    modules_HLV <- getModules(TOMdis_HLV, height=height, mingenes=mingenes, GTEx.obj=GTEx.object, tissue = "Heart - Left Ventricle",genes_to_keep=genes_to_keep_HLV, plot=T, verbose=T)$modules
+    
+    lapply(modulesBC, length)
+    
+    visualizeEnrichment(moduleObj = modules_HLV,
+                    SigGenes_Obj = SigGenes_Obj, 
+                    tissue = "Heart - Left Ventricle", 
+                    reference = "Descartes", mingenes=mingenes, height=height,genes_to_keep=genes_to_keep_HLV)
+     
+  }
+}
+```
+```{r fig.width=12, fig.height=6}
+
+# Exploratory analysis to choose mingenes and min height
+for (mingenes in seq(10,35,5)) {
+  for (height in seq(0.9,1,0.01)){
+    
+    print(paste0("Mingenes: ", mingenes,"; height: ", height))
+    
+    # Static TOM was chosen for this part, as it gave modules more coherent with was observed in the dendogram
+    # "grey" module is removed, as it contains the unassigned genes. Eases visualization
+    modules_HLV <- getModules(TOMdis_HLV, height=height, mingenes=mingenes, GTEx.obj=GTEx.object, tissue = "Heart - Left Ventricle",genes_to_keep=genes_to_keep_HLV, plot=T, verbose=T)$modules
+    
+    lapply(modulesBC, length)
+    
+    visualizeEnrichment(moduleObj = modules_HLV,
+                    SigGenes_Obj = SigGenes_Obj, 
+                    tissue = "Heart - Left Ventricle", 
+                    reference = "Cui", mingenes=mingenes, height=height,genes_to_keep=genes_to_keep_HLV)
+     
+  }
+}
+```
+ 
+  
+
+```{r fig.width=12, fig.height=6}
+genes_to_keep_HLV <- filterVar(GTExobj=GTEx.object, tissue="Heart - Left Ventricle", thresh_var=0.35)
+# Choosing the parameters that better fit this tissue
+mingenes <- 20
+height <- 0.99
+modulesHLV <- getModules(TOMdis_HLV, height=height, mingenes=mingenes, GTEx.obj=GTEx.object, tissue = "Heart - Left Ventricle",genes_to_keep=genes_to_keep_HLV, plot=T, verbose=T) 
+
+visualizeEnrichment(moduleObj = modulesHLV$modules,
+                    SigGenes_Obj = SigGenes_Obj, 
+                    tissue = "Heart - Left Ventricle", 
+                    reference = "Descartes", mingenes=mingenes, height=height,genes_to_keep=genes_to_keep_HLV)
+
+visualizeEnrichment(moduleObj = modulesHLV$modules,
+                    SigGenes_Obj = SigGenes_Obj, 
+                    tissue = "Heart - Left Ventricle", 
+                    reference = "Cui", mingenes=mingenes, height=height,genes_to_keep=genes_to_keep_HLV)
+ 
+
+eigengenesHLV <- modulesHLV$eigengenes
+eigengenesHLV <- eigengenesHLV[,colnames(eigengenesHLV)!="MEgrey"]
+modulesHLV <- modulesHLV$modules
+
+
+eigengenesHLV <- eigengenesHLV[,colnames(eigengenesHLV)!="MEpink"] # because it only contains pseudogenes and we don't get enrichment for diseases 
+modulesHLV <- modulesHLV[names(modulesHLV)!="MEpink"]
+
+
+```
+ 
+
+```{r}
+eigengenesHLV_aux <- eigengenesHLV
+eigengenesHLV_aux$SAMPID <- row.names(eigengenesHLV_aux)
+eigengenesHLV_aux <- merge(GTEx.object[["Heart - Left Ventricle"]]$metadata[,c("SAMPID","AGE")], eigengenesHLV_aux, by="SAMPID")
+
+for (i in c(3:ncol(eigengenesHLV_aux))){
+  moduledata <- eigengenesHLV_aux[,c(1,2,i)]
+  print(ggplot(moduledata, aes(x=AGE, y=get(colnames(moduledata)[3])))+
+    geom_point()+ geom_smooth()+
+      ggtitle(colnames(moduledata)[3]))
+}
+
+```
+ 
+### Whole blood
+ 
+
+```{r}
+# The minimum number of genes should be greater than 5000 for this type of analysis, as advised in  the WGCNA tutorial
+# https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/Tutorials/Simulated-05-NetworkConstruction.pdf
+genes_to_keep_WB <- filterVar(GTExobj=GTEx.object, tissue="Whole Blood", thresh_var=0.9)
+print(paste0("Genes to keep: ",length(genes_to_keep_WB)))
+# beta = 12 is advised in the WGCNA FAQs for signed networks
+# https://horvath.genetics.ucla.edu/html/CoexpressionNetwork/Rpackages/WGCNA/faq.html
+pickBeta(GTExobj=GTEx.object, tissue="Whole Blood", genes_to_keep=genes_to_keep_WB, beta=12)
+# to get more biologically relevant results, signed networks are advised. We are using bicor instead of cor, as also advised for WGCNA using RNA-seq data
+# https://academic.oup.com/bib/article/19/4/575/2888441
+# Similar analysis reported in the WGCNA tutorial were performed. From those analysis, calculating the dissimilarity matrix using TOM was the one giving more meaningful results
+TOMdis_WB <- getDissimilarityMatrix(GTExobj=GTEx.object, tissue="Whole Blood", genes_to_keep=genes_to_keep_WB, beta=12, type="signed")
+ 
+```
+
+```{r fig.width=10, fig.height=5}
+
+# Exploratory analysis to choose mingenes and min height
+for (mingenes in seq(10,50,5)) {
+  for (height in seq(0.9,1,0.01)){
+    
+    print(paste0("Mingenes: ", mingenes,"; height: ", height))
+    
+    # Static TOM was chosen for this part, as it gave modules more coherent with was observed in the dendogram
+    # "grey" module is removed, as it contains the unassigned genes. Eases visualization
+    modules_WB <- getModules(TOMdis_WB, height=height, mingenes=mingenes, GTEx.obj=GTEx.object, tissue = "Whole Blood",genes_to_keep=genes_to_keep_WB, plot=T, verbose=T)$modules
+    
+    visualizeEnrichment(moduleObj = modules_WB,
+                    SigGenes_Obj = SigGenes_Obj, 
+                    tissue = "Whole Blood", 
+                    reference = "Hay", mingenes=mingenes, height=height,genes_to_keep=genes_to_keep_WB)
+     
+  }
+}
+```
+ 
+ 
+```{r fig.width=10, fig.height=5}
+
+# Exploratory analysis to choose mingenes and min height
+for (mingenes in seq(10,40,5)) {
+  for (height in seq(0.9,1,0.01)){
+    
+    print(paste0("Mingenes: ", mingenes,"; height: ", height))
+    
+    # Static TOM was chosen for this part, as it gave modules more coherent with was observed in the dendogram
+    # "grey" module is removed, as it contains the unassigned genes. Eases visualization
+    modules_WB <- getModules(TOMdis_WB, height=height, mingenes=mingenes, GTEx.obj=GTEx.object, tissue = "Whole Blood",genes_to_keep=genes_to_keep_WB, plot=T, verbose=T)$modules
+    
+    visualizeEnrichment(moduleObj = modules_WB,
+                    SigGenes_Obj = SigGenes_Obj, 
+                    tissue = "Whole Blood", 
+                    reference = "LM22", mingenes=mingenes, height=height,genes_to_keep=genes_to_keep_WB)
+     
+  }
+}
+```
+ 
+```{r fig.width=12, fig.height=6}
+genes_to_keep_WB <- filterVar(GTExobj=GTEx.object, tissue="Whole Blood", thresh_var=0.9)
+# Choosing the parameters that better fit this tissue
+mingenes <- 15
+height <- 0.97
+modulesWB <- getModules(TOMdis_WB, height=height, mingenes=mingenes, GTEx.obj=GTEx.object, tissue = "Whole Blood",genes_to_keep=genes_to_keep_WB, plot=T, verbose=T) 
+
+visualizeEnrichment(moduleObj = modulesWB$modules,
+                    SigGenes_Obj = SigGenes_Obj, 
+                    tissue = "Whole Blood", 
+                    reference = "Hay", mingenes=mingenes, height=height,genes_to_keep=genes_to_keep_WB)
+ 
+visualizeEnrichment(moduleObj = modulesWB$modules,
+                    SigGenes_Obj = SigGenes_Obj, 
+                    tissue = "Whole Blood", 
+                    reference = "LM22", mingenes=mingenes, height=height,genes_to_keep=genes_to_keep_WB)
+ 
+eigengenesWB <- modulesWB$eigengenes
+eigengenesWB <- eigengenesWB[,colnames(eigengenesWB)!="MEgrey"]
+modulesWB <- modulesWB$modules
+
+```
+ 
+
+```{r}
+eigengenesWB_aux <- eigengenesWB
+eigengenesWB_aux$SAMPID <- row.names(eigengenesWB_aux)
+eigengenesWB_aux <- merge(GTEx.object[["Whole Blood"]]$metadata[,c("SAMPID","AGE")], eigengenesWB_aux, by="SAMPID")
+
+for (i in c(3:ncol(eigengenesWB_aux))){
+  moduledata <- eigengenesWB_aux[,c(1,2,i)]
+  print(ggplot(moduledata, aes(x=AGE, y=get(colnames(moduledata)[3])))+
+    geom_point()+ geom_smooth()+
+      ggtitle(colnames(moduledata)[3]))
+}
+
+```
+
+## Pathways
+
+We first need to define exactly what pathways we want to calculate "enrichment". The "most representative" pathways were determined above.
+
+```{r}
+DBPathways_subset <- DBPathways[Cluster_Reactome$pathways]
+saveRDS(DBPathways_subset, "AppData/DBPathways_mostrepresentative.Rds")
+```
+
+### Functions
+
+```{r}
+ 
+getEnrichment_perPathway <- function(moduleObj,DBPathwaysObj, genes_to_keep ){
+  
+  enrichmentPathway <- data.frame(NULL)
+  
+  for (module in names(moduleObj)){
+    
+    module_genes <- moduleObj[[module]]
+    
+    
+    for (pathway in names(DBPathwaysObj)){
+      
+      other_genes <- genes_to_keep
+      
+      # Get signature of the pathway of the iteration
+      pathway_genes <-DBPathwaysObj[[pathway]]
+      pathway_genes <- pathway_genes[pathway_genes %in% genes_to_keep]
+      
+      fisher <- GetEnrichment(signature_genes=pathway_genes, 
+                              other_genes=other_genes, 
+                              module_genes=module_genes)
+      
+      enrichmentPathway_aux <- c(pathway, module, fisher["value"] )
+      
+      
+      
+      enrichmentPathway <- rbind(enrichmentPathway, enrichmentPathway_aux)
+      
+    }
+    
+    
+  }
+  
+  enrichmentPathway <- as.data.frame(enrichmentPathway)
+  
+  enrichmentPathway[,3] <- 10^(-as.numeric(enrichmentPathway[,3]))
+  
+  enrichmentPathway$padj <- p.adjust(enrichmentPathway[,3], method = "BH")
+  
+  colnames(enrichmentPathway) <- c("pathway","module", "pvalue", "padj")
+   
+  enrichmentPathway$pvalue <- as.numeric(enrichmentPathway$pvalue)
+  
+  # removing pathways that do not have any adjusted p value <=0.05 in all modules
+  # Splitting the data by pathway
+  split_data <- split(enrichmentPathway, enrichmentPathway$pathway)
+  
+  # Filtering the pathways where all pvals are less than 0.05
+  filtered_lists <- lapply(split_data, function(df) {
+    if(all(df$padj >= 0.05)) return(NULL)
+    else return(df)
+  })
+  
+  # Removing NULL elements (pathways that didn't meet the criteria)
+  filtered_lists <- Filter(Negate(is.null), filtered_lists)
+  
+  # Binding the data back together
+  enrichmentPathway <- as.data.frame(do.call(rbind, filtered_lists))
+
+  #calculating matrix
+  matrix <- dcast(data = enrichmentPathway,formula = module~pathway, value.var = "padj")
+  row.names(matrix) <- matrix$module
+  matrix$module <- NULL
+  matrix <- as.matrix(matrix)
+  matrix <- -log10(matrix)
+  
+  return(list(dataframe=enrichmentPathway,
+              matrix=matrix))
+}
+
+PathwayEnrichmentGetter <- function(moduleObj_list, DBPathwaysObj, genes_to_keep_list){
+  pathway_enrichment_list <- list()
+  for (tissue in names(moduleObj_list)){
+    pathway_enrichment_list[[tissue]] <- getEnrichment_perPathway(moduleObj = moduleObj_list[[tissue]], DBPathwaysObj = DBPathwaysObj, genes_to_keep = genes_to_keep_list[[tissue]]) 
+  }
+  return(pathway_enrichment_list)
+} 
+
+PathwayContingencyTableR <- function(moduleObj_list, DBPathwaysObj, genes_to_keep_list){
+  conti_table <- data.frame(NULL)
+  for (tissue in names(moduleObj_list)){
+    for (module in names(moduleObj_list[[tissue]])){
+      
+       module_genes <- moduleObj_list[[tissue]][[module]]
+       
+      for (pathway in names(DBPathwaysObj)){
+        
+        other_genes <- genes_to_keep_list[[tissue]]
+        
+        # Get signature of the pathway of the iteration
+        pathway_genes <-DBPathwaysObj[[pathway]]
+        pathway_genes <- pathway_genes[pathway_genes %in% genes_to_keep_list[[tissue]]]
+        # Create the contingency table
+        contingency_table <- c(
+          length(intersect(module_genes, pathway_genes)),  # Genes in module and pathway
+          length(setdiff(module_genes, pathway_genes)),    # Genes in module but not in pathway
+          length(setdiff(pathway_genes, module_genes)),    # Genes in pathway but not in module
+          length(intersect(setdiff(other_genes, module_genes), 
+                           setdiff(other_genes, pathway_genes))) # Genes in neither
+        )
+        line_forcontingency <- c(module, pathway, tissue, contingency_table)
+       conti_table <- rbind(conti_table, line_forcontingency)
+        
+      }
+    }
+  }
+  conti_table <- as.data.frame(conti_table)
+  colnames(conti_table) <- c("module", "pathway", "tissue", "INmoduleINpathway", "INmoduleOUTpathway", "OUTmoduleINpathway", "OUTmoduleOUTpathway")
+  return(conti_table)
+}
+
+```
+
+ 
+
+## Diseases
+
+Data Preparation:
+
+```{r warning=FALSE}
+# From DIsGeNet website
+ListOfDiseases <- read.table("auxiliary_files/disease_mappings_to_attributes.tsv", sep="\t", header=T)
+
+row.names(ListOfDiseases) <- ListOfDiseases$name
+#ListOfDiseases <- subset(ListOfDiseases, NofGenes>=20)
+library(disgenet2r)
+Sys.setenv(DISGENET_API_KEY= "InsertYourKey")
+
+#To determine the genesets of each disease
+disease_genesets <- list()
+i=1
+for (disease in ListOfDiseases$diseaseId){
+  disease_genes <- disease2gene( disease  = disease,
+                                 database = "CURATED",
+                                 score    = c( 0,1 ) )
+  if(class(disease_genes)=="DataGeNET.DGN"){
+    dis <- disease_genes@qresult[["disease_name"]][1]
+    disease_genes <- disease_genes@qresult[["gene_symbol"]]
+    disease_genesets[[dis]] <- list()
+    disease_genesets[[dis]][["genes"]] <- disease_genes
+    disease_genesets[[dis]][["diseaseClass"]] <- ListOfDiseases[dis,"umlsSemanticTypeName"]
+    
+  }
+  print(i)
+  i=i+1
+}
+
+# Create a logical vector indicating which list elements meet the condition
+keep_indices <- sapply(disease_genesets, function(obj) length(obj$genes) >= 20 & length(obj$genes) <= 500)
+
+# Filter the list using the logical vector
+disease_genesets_subset <- disease_genesets[keep_indices]
+
+saveRDS(disease_genesets_subset, "AppData/DBDiseases.RDS")
+
+```
+
+
+```{r}
+disease_genesets_subset <- readRDS("AppData/DBDiseases.RDS")
+```
+
+### Functions
+
+
+```{r}
+ 
+
+getEnrichment_perdisease_disgenet2r <- function(moduleObj, genes_to_keep ){
+  
+  enrichmentdisease <- data.frame(NULL)
+  
+  for (module in names(moduleObj)){
+    
+    module_genes <- moduleObj[[module]]
+    
+    
+    #for (disease in names(DBdiseasesObj)){
+      
+      #other_genes <- genes_to_keep
+      
+      # Get signature of the disease of the iteration
+      #disease_genes <- DBdiseasesObj[[disease]][["genes"]]
+      #disease_genes <- disease_genes[disease_genes %in% genes_to_keep]
+      
+      disgenet2r <- disease_enrichment(module_genes, 
+                                       vocabulary = "HGNC",
+                             database = "CURATED")@qresult
+     
+      enrichmentdisease_aux <- cbind(paste0("umls:", disgenet2r$ID),
+                                     disgenet2r$Description, 
+                                     disgenet2r$pvalue, 
+                                     disgenet2r$FDR,
+                                     rep(module, nrow(disgenet2r) ))
+      
+      enrichmentdisease <- rbind(enrichmentdisease, enrichmentdisease_aux)
+      
+    #}
+    
+    
+  }
+  
+  enrichmentdisease <- as.data.frame(enrichmentdisease)
+  #row.names(enrichmentdisease) <- enrichmentdisease[,1]
+ 
+ #enrichmentdisease[,1] <- NULL
+  
+  colnames(enrichmentdisease) <- c("ID", "Description", "pvalue", "p.adjust", "module")
+   
+  enrichmentdisease$pvalue <- as.numeric(enrichmentdisease$pvalue)
+  enrichmentdisease$p.adjust <- as.numeric(enrichmentdisease$p.adjust)
+  
+  # removing diseases that do not have any adjusted p value <=0.05 in all modules
+  # Splitting the data by disease
+  
+  split_data <- split(enrichmentdisease, enrichmentdisease$Description)
+  
+  # Filtering the diseases where all pvals are less than 0.05
+  filtered_lists <- lapply(split_data, function(df) {
+    if(all(df$p.adjust >= 0.05)) return(NULL)
+    else return(df)
+  })
+  
+  # Removing NULL elements (diseases that didn't meet the criteria)
+  filtered_lists <- Filter(Negate(is.null), filtered_lists)
+  
+  unique_modules <- unique(enrichmentdisease$module)
+  # Function to ensure all modules are present in a data frame
+  ensure_all_modules <- function(df) {
+    missing_modules <- setdiff(unique_modules, df$module)
+    if(length(missing_modules)!=0){
+    ID <- unique(df$ID)
+    disease <- unique(df$Description)
+    # Create a data frame for missing modules
+    missing_df <- data.frame(
+      ID = ID,
+      Description = disease,
+      pvalue = NA,
+      p.adjust = NA,
+      module = missing_modules
+    )
+    
+    # Combine original data frame with missing modules data frame
+    return(as.data.frame(rbind(df, missing_df)))
+    } else {
+      return(df)
+    }
+  }
+
+  # Apply function to each data frame in the list 
+  corrected_list_of_dfs <- lapply(filtered_lists, ensure_all_modules)
+    
+  # Binding the data back together
+  enrichmentdisease <- as.data.frame(do.call(rbind, corrected_list_of_dfs))
+  
+  # now the same approach, but to keep only diseases that are represented in each module
+  # Split data frame by disease
+  # split_data <- split(enrichmentdisease, enrichmentdisease$Description)
+  # unique_modules <- unique(enrichmentdisease$module)
+  # # Filter diseases that have all unique modules
+  # filtered_data_list <- lapply(split_data, function(df) {
+  #   if(all(unique_modules %in% df$module)) {
+  #     return(df)
+  #   } else {
+  #     return(NULL)
+  #   }
+  # })
+  # 
+  #  # Removing NULL elements (diseases that didn't meet the criteria)
+  # filtered_data_list <- Filter(Negate(is.null), filtered_data_list)
+  # 
+  # # Bind all the filtered data frames together
+  # enrichmentdisease <- as.data.frame(do.call(rbind, filtered_data_list))
+   row.names(enrichmentdisease) <- c(1:nrow(enrichmentdisease))
+   enrichmentdisease$ID <- NULL
+  #calculating matrix
+  matrix <-  enrichmentdisease[,c("Description","module", "p.adjust")]
+  colnames(matrix) <- c("Disease","Module","padj")
+  
+  return(list(dataframe=enrichmentdisease,
+              matrix=matrix))
+}
+
+
+
+diseaseEnrichmentGetter_disgenet2r <- function(moduleObj_list,   genes_to_keep_list){
+  disease_enrichment_list <- list()
+  for (tissue in names(moduleObj_list)){
+    disease_enrichment_list[[tissue]] <- getEnrichment_perdisease_disgenet2r(moduleObj = moduleObj_list[[tissue]], genes_to_keep = genes_to_keep_list[[tissue]]) 
+  }
+  return(disease_enrichment_list)
+} 
+
+
+
+
+
+getEnrichment_perdisease_manual <- function(moduleObj,DBdiseasesObj, genes_to_keep ){
+  
+  enrichmentdisease <- data.frame(NULL)
+  
+  for (module in names(moduleObj)){
+    
+    module_genes <- moduleObj[[module]]
+    
+    
+    for (disease in names(DBdiseasesObj)){
+      
+      other_genes <- genes_to_keep
+      
+      # Get signature of the disease of the iteration
+      disease_genes <- DBdiseasesObj[[disease]][["genes"]]
+      disease_genes <- disease_genes[disease_genes %in% genes_to_keep]
+      
+      fisher <- GetEnrichment(signature_genes=disease_genes, 
+                              other_genes=other_genes, 
+                              module_genes=module_genes)
+      
+      enrichmentdisease_aux <- c(disease, module, fisher["value"],NA,  DBdiseasesObj[[disease]][["diseaseClass"]] )
+      
+      
+      
+      enrichmentdisease <- rbind(enrichmentdisease, enrichmentdisease_aux)
+      
+    }
+    
+    
+  }
+  
+  enrichmentdisease <- as.data.frame(enrichmentdisease)
+  
+  enrichmentdisease[,3] <- 10^(-as.numeric(enrichmentdisease[,3]))
+  
+  enrichmentdisease[,4] <- p.adjust(enrichmentdisease[,3], method = "BH")
+  
+  colnames(enrichmentdisease) <- c("disease","module", "pvalue", "padj","diseaseClass")
+   
+  enrichmentdisease$pvalue <- as.numeric(enrichmentdisease$pvalue)
+  
+  enrichmentdisease <- enrichmentdisease[,c("module","disease","pvalue","padj","diseaseClass")]
+  
+  # removing diseases that do not have any adjusted p value <=0.05 in all modules
+  # Splitting the data by disease
+  split_data <- split(enrichmentdisease, enrichmentdisease$disease)
+  
+  # Filtering the diseases where all pvals are less than 0.05
+  filtered_lists <- lapply(split_data, function(df) {
+    if(all(df$padj >= 0.05)) return(NULL)
+    else return(df)
+  })
+  
+  # Removing NULL elements (diseases that didn't meet the criteria)
+  filtered_lists <- Filter(Negate(is.null), filtered_lists)
+  
+  # Binding the data back together
+  enrichmentdisease <- as.data.frame(do.call(rbind, filtered_lists))
+  enrichmentdisease$ID <- NULL
+   row.names(enrichmentdisease) <- c(1:nrow(enrichmentdisease))
+  
+
+  
+  
+  #calculating matrix
+  matrix <-  enrichmentdisease[,c("disease","module", "padj")]
+  colnames(matrix) <- c("Disease","Module","padj")
+  
+  return(list(dataframe=enrichmentdisease,
+              matrix=matrix))
+}
+
+
+diseaseEnrichmentGetter_manual <- function(moduleObj_list, DBdiseasesObj, genes_to_keep_list){
+  disease_enrichment_list <- list()
+  for (tissue in names(moduleObj_list)){
+    disease_enrichment_list[[tissue]] <- getEnrichment_perdisease_manual(moduleObj = moduleObj_list[[tissue]], DBdiseasesObj = DBdiseasesObj, genes_to_keep = genes_to_keep_list[[tissue]]) 
+  }
+  return(disease_enrichment_list)
+} 
+
+
+DiseaseContingencyTableR <- function(moduleObj_list, DBDiseaseObj, genes_to_keep_list){
+  conti_table <- data.frame(NULL)
+  for (tissue in names(moduleObj_list)){
+    for (module in names(moduleObj_list[[tissue]])){
+      
+       module_genes <- moduleObj_list[[tissue]][[module]]
+       
+      for (disease in names(DBDiseaseObj)){
+        
+        other_genes <- genes_to_keep_list[[tissue]]
+        
+        # Get signature of the pathway of the iteration
+        disease_genes <-DBDiseaseObj[[disease]]$genes
+        disease_genes <- disease_genes[disease_genes %in% genes_to_keep_list[[tissue]]]
+        # Create the contingency table
+        contingency_table <- c(
+          length(intersect(module_genes, disease_genes)),  # Genes in module and disease
+          length(setdiff(module_genes, disease_genes)),    # Genes in module but not in disease
+          length(setdiff(disease_genes, module_genes)),    # Genes in disease but not in module
+          length(intersect(setdiff(other_genes, module_genes), 
+                           setdiff(other_genes, disease_genes))) # Genes in neither
+        )
+        line_forcontingency <- c(module, disease, tissue, contingency_table)
+       conti_table <- rbind(conti_table, line_forcontingency)
+        
+      }
+    }
+  }
+  conti_table <- as.data.frame(conti_table)
+  colnames(conti_table) <- c("module", "disease", "tissue", "INmoduleINpathway", "INmoduleOUTpathway", "OUTmoduleINpathway", "OUTmoduleOUTpathway")
+  return(conti_table)
+}
+
+```
+
+
+### Testing
+
+```{r}
+ 
+test <- getEnrichment_perdisease_disgenet2r(moduleObj = modulesBC,  genes_to_keep = genes_to_keep_BC)
+ux <- getEnrichment_perdisease_manual(moduleObj = modulesBC, DBdiseasesObj = disease_genesets_subset, genes_to_keep = genes_to_keep_BC)
+ 
+```
+
+
+
+
+# F. Format data for voyAGEr web app
+
+ 
+## Gene Expression Data
+
+
+
+```{r}
+
+# August 7th, 2023
+
+# Create a biomaRt object to access the Ensembl database
+ensembl <- useMart("ENSEMBL_MART_ENSEMBL", dataset = "hsapiens_gene_ensembl")
+
+# Retrieve gene information (Ensembl ID, gene name, HGNC symbol, Entrez ID)
+gene_info <- getBM(
+  attributes = c("ensembl_gene_id", "external_gene_name", "hgnc_symbol", "entrezgene_id"),
+  mart = ensembl
+)
+
+# Rename columns for clarity
+colnames(gene_info) <- c("gene_name", "gene_Symbol", "hgnc_symbol", "entrez_id")
+
+
+```
+
+
+```{r}
+GeneNamesVec <- c()
+for (tissue in names(GTEx.object)){
+  LogNormCounts <- GTEx.object[[tissue]]$logCPM
+  GeneNamesVec <- unique(c(GeneNamesVec,row.names(LogNormCounts)))
+}
+
+```
+
+```{r}
+gene_info <- merge(data.frame(hgnc_symbol=GeneNamesVec),gene_info, by="hgnc_symbol", all.x=TRUE )
+gene_info[gene_info == ''] <- NA
+
+```
+
+
+```{r}
+
+
+ExprObj <- list()
+i=1
+for (gene in GeneNamesVec){
+  DFtemp_alltissue <- NULL
+  metadatatemp_alltissues <- NULL
+  #j=1
+  print(paste0(gene, " (",i,"/", length(GeneNamesVec),")"))
+  for (tissue in names(GTEx.object)){
+    
+    #print(paste0(gene, " (",i,"/", length(GeneNamesVec),")" , " | ", tissue, " (",j,"/", length(names(GTEx.object)),")" ))
+    
+    LogNormCounts <- GTEx.object[[tissue]]$logCPM
+    metadata <- GTEx.object[[tissue]]$metadata
+    
+    metadata_aux <- metadata[,c("SAMPID","AGE","SEX")]
+    colnames(metadata_aux) <- c("samp_id", "age", "sex")
+    
+    
+    if (gene %in% row.names(LogNormCounts)){
+      
+      
+      DFtemp_tissue_aux <- data.frame(expression=as.vector(t(LogNormCounts[gene,])),
+                                      gene_Symbol=rep(gene, ncol(LogNormCounts)),
+                                      tissue = rep(tissue,ncol(LogNormCounts)),
+                                      samp_id = colnames(LogNormCounts))
+      
+      DFtemp_tissue_aux <- merge(DFtemp_tissue_aux, metadata_aux, by="samp_id", all.x=TRUE)
+      
+      # gene_info_subset <-  data.frame(matrix(replicate(nrow(DFtemp_tissue_aux), 
+      #                                    as.vector(t(gene_info[gene_info$external_gene_name==gene,]))), 
+      #                          ncol = 4, 
+      #                          byrow = T))
+      
+      
+      num_rows <- nrow(DFtemp_tissue_aux)
+      genedata <- gene_info[gene_info$hgnc_symbol==gene,]
+      
+      gene_info_subset <- data.frame(
+        gene_name = rep(genedata$gene_name, times = num_rows),
+        gene_Symbol = rep(genedata$gene_Symbol, times = num_rows),
+        hgnc_symbol = rep(genedata$hgnc_symbol, times = num_rows),
+        entrez_id = rep(genedata$entrez_id, times = num_rows)
+      )
+      
+      
+      
+      DFtemp_tissue_aux <- cbind(DFtemp_tissue_aux,gene_info_subset)
+      
+      DFtemp_alltissue <- rbind(DFtemp_alltissue, DFtemp_tissue_aux)
+      
+      #j = j + 1
+      
+    }
+  }
+  
+  DF_expr_temp <- as.data.frame(DFtemp_alltissue)
+  DF_expr_temp <- DF_expr_temp[,c("gene_name","samp_id","expression","gene_Symbol" ,"entrez_id","hgnc_symbol" ,"age","sex","tissue"   )]
+  
+  ExprObj[[gene]] <- DF_expr_temp
+  
+  saveRDS(DF_expr_temp, paste0("AppData/DB_GeneExpression_correctGeneSymbol/",gsub("-","_",gene),".RDS"))
+  
+  i = i+1
+}
+
+```
+
+## DB_pvalue_ShARP-LM
+
+
+```{r}
+# Loop over each tissue in the 'sharpie' list
+for (tissue_name in names(sharpLM.object)) {
+  
+  # Modify tissue_name according to your rules
+  modified_tissue_name <- gsub(" ", "", tissue_name) # Remove whitespace
+  modified_tissue_name <- gsub("-", "_", modified_tissue_name) # Replace ' - ' with '_'
+  modified_tissue_name <- gsub("\\(", "", modified_tissue_name) # Remove '('
+  modified_tissue_name <- gsub("\\)", "", modified_tissue_name) # Remove ')'
+  
+  # Extract the data for the current tissue
+  tissue_data <- sharpLM.object[[tissue_name]]
+  
+  # Loop over each division ("AGE", "SEX", "AGEX") in the current tissue
+  for (division_name in names(tissue_data)) {
+    
+    # Modify division_name according to your rules
+    modified_division_name <- ifelse(division_name == "AGE", "Age",
+                                    ifelse(division_name == "SEX", "Gender", "Int_Age_Gender"))
+    
+    # Extract the data for the current division
+    division_data <- tissue_data[[division_name]]
+    
+    # Extract the "Pvalue" data frame from the current division
+    pvalue_df <- division_data$pval
+    
+    # Create a name for the .RDS file
+    rds_name <- paste0("AppData/DB_pvalue_ShARP-LM/", modified_tissue_name, "_",modified_division_name, ".RDS")
+    
+    # Save the "Pvalue" data frame as an RDS file
+    saveRDS(pvalue_df, file = rds_name)
+  }
+}
+
+```
+
+## sharpLM.object.entireAgeRange
+
+```{r}
+sharpLM.object.entireAgeRange
+sharpLM.object.entireAgeRange_toSave <- sharpLM.object.entireAgeRange
+
+for (tissue_name in names(sharpLM.object.entireAgeRange_toSave)) {
+  
+  # Modify tissue_name according to your rules
+  modified_tissue_name <- gsub(" ", "", tissue_name) # Remove whitespace
+  modified_tissue_name <- gsub("-", "_", modified_tissue_name) # Replace ' - ' with '_'
+  modified_tissue_name <- gsub("\\(", "", modified_tissue_name) # Remove '('
+  modified_tissue_name <- gsub("\\)", "", modified_tissue_name) # Remove ')'
+  
+  # Extract the data for the current tissue
+  tissue_data <- sharpLM.object.entireAgeRange_toSave[[tissue_name]]
+  
+  # Loop over each division ("AGE", "SEX", "AGEX") in the current tissue
+  for (division_name in unique(tissue_data$variable)) {
+    
+    # Modify division_name according to your rules
+    modified_division_name <- ifelse(division_name == "AGE", "Age",
+                                    ifelse(division_name == "SEX", "Gender", "Int_Age_Gender"))
+    
+    # Extract the data for the current division
+    division_data <- tissue_data[tissue_data$variable==division_name,]
+     
+    # Create a name for the .RDS file
+    rds_name <- paste0("AppData/DB_pvalue_ShARP-LM_EntireAgeRange/", modified_tissue_name, "_",modified_division_name, ".RDS")
+    
+    # Save the "Pvalue" data frame as an RDS file
+    saveRDS(division_data, file = rds_name)
+  }
+}
+
+```
+
+
+## sharpLM.object.entireAgeRange_abline
+
+```{r}
+ 
+sharpLM.object.entireAgeRange_abline_toSave <- sharpLM.object.entireAgeRange_abline
+
+for (tissue_name in names(sharpLM.object.entireAgeRange_abline_toSave)) {
+  
+  # Modify tissue_name according to your rules
+  modified_tissue_name <- gsub(" ", "", tissue_name) # Remove whitespace
+  modified_tissue_name <- gsub("-", "_", modified_tissue_name) # Replace ' - ' with '_'
+  modified_tissue_name <- gsub("\\(", "", modified_tissue_name) # Remove '('
+  modified_tissue_name <- gsub("\\)", "", modified_tissue_name) # Remove ')'
+  
+  # Extract the data for the current tissue
+  tissue_data <- sharpLM.object.entireAgeRange_abline_toSave[[tissue_name]]
+  
+  # Loop over each division ("AGE", "SEX", "AGEX") in the current tissue
+  for (division_name in unique(tissue_data$variable)) {
+    
+    # Modify division_name according to your rules
+    modified_division_name <- ifelse(division_name == "AGE", "Age",
+                                    ifelse(division_name == "SEX", "Gender", "Int_Age_Gender"))
+    
+    # Extract the data for the current division
+    division_data <- tissue_data[tissue_data$variable==division_name,]
+     
+    # Create a name for the .RDS file
+    rds_name <- paste0("AppData/DB_pvalue_ShARP-LM_EntireAgeRange_abline/", modified_tissue_name, "_",modified_division_name, ".RDS")
+    
+    # Save the "Pvalue" data frame as an RDS file
+    saveRDS(division_data, file = rds_name)
+  }
+}
+
+```
+
+## Clustering of Pathways
+
+```{r}
+
+# August 7th, 2023
+
+# Create a biomaRt object to access the Ensembl database
+ensembl <- useMart("ENSEMBL_MART_ENSEMBL", dataset = "hsapiens_gene_ensembl")
+
+# Retrieve gene information (Ensembl ID, gene name, HGNC symbol, Entrez ID)
+gene_info <- getBM(
+  attributes = c("ensembl_gene_id", "external_gene_name", "hgnc_symbol", "entrezgene_id"),
+  mart = ensembl
+)
+
+# Rename columns for clarity
+colnames(gene_info) <- c("gene_name", "gene_Symbol", "hgnc_symbol", "entrez_id")
+
+
+```
+
+
+```{r}
+GeneNamesVec <- c()
+for (tissue in names(GTEx.object)){
+  LogNormCounts <- GTEx.object[[tissue]]$logCPM
+  GeneNamesVec <- unique(c(GeneNamesVec,row.names(LogNormCounts)))
+}
+
+```
+
+```{r}
+gene_info <- merge(data.frame(gene_Symbol=GeneNamesVec),gene_info, by="gene_Symbol", all.x=TRUE )
+gene_info[gene_info == ''] <- NA
+
+```
+
+
+```{r}
+
+
+ExprObj <- list()
+i=1
+for (gene in GeneNamesVec){
+  DFtemp_alltissue <- NULL
+  metadatatemp_alltissues <- NULL
+  #j=1
+  print(paste0(gene, " (",i,"/", length(GeneNamesVec),")"))
+  for (tissue in names(GTEx.object)){
+    
+    #print(paste0(gene, " (",i,"/", length(GeneNamesVec),")" , " | ", tissue, " (",j,"/", length(names(GTEx.object)),")" ))
+    
+    
+    
+    LogNormCounts <- GTEx.object[[tissue]]$logCPM
+    metadata <- GTEx.object[[tissue]]$metadata
+    
+    metadata_aux <- metadata[,c("SAMPID","AGE","SEX")]
+    colnames(metadata_aux) <- c("samp_id", "age", "sex")
+    
+    
+    if (gene %in% row.names(LogNormCounts)){
+      
+      
+      DFtemp_tissue_aux <- data.frame(expression=as.vector(t(LogNormCounts[gene,])),
+                                      gene_Symbol=rep(gene, ncol(LogNormCounts)),
+                                      tissue = rep(tissue,ncol(LogNormCounts)),
+                                      samp_id = colnames(LogNormCounts))
+      
+      DFtemp_tissue_aux <- merge(DFtemp_tissue_aux, metadata_aux, by="samp_id", all.x=TRUE)
+      
+      # gene_info_subset <-  data.frame(matrix(replicate(nrow(DFtemp_tissue_aux), 
+      #                                    as.vector(t(gene_info[gene_info$external_gene_name==gene,]))), 
+      #                          ncol = 4, 
+      #                          byrow = T))
+      
+      
+      num_rows <- nrow(DFtemp_tissue_aux)
+      genedata <- gene_info[gene_info$gene_Symbol==gene,]
+      
+      gene_info_subset <- data.frame(
+        gene_name = rep(genedata$gene_name, times = num_rows),
+        gene_Symbol = rep(genedata$gene_Symbol, times = num_rows),
+        hgnc_symbol = rep(genedata$hgnc_symbol, times = num_rows),
+        entrez_id = rep(genedata$entrez_id, times = num_rows)
+      )
+      
+      
+      
+      DFtemp_tissue_aux <- cbind(DFtemp_tissue_aux,gene_info_subset)
+      
+      DFtemp_alltissue <- rbind(DFtemp_alltissue, DFtemp_tissue_aux)
+      
+      #j = j + 1
+      
+    }
+  }
+  
+  DF_expr_temp <- as.data.frame(DFtemp_alltissue)
+  DF_expr_temp <- DF_expr_temp[,c("gene_name","samp_id","expression","gene_Symbol" ,"entrez_id","hgnc_symbol" ,"age","sex","tissue"   )]
+  
+  ExprObj[[gene]] <- DF_expr_temp
+  
+  i = i+1
+}
+
+```
+
+## Modules
+
+### voyAGEr object
+
+```{r}
+build_moduleObj <- function(GTExobj, moduleObjlist, SigGenes_Obj, eigengeneObjList, genes_to_keepList, DBPathwaysObj, DBDiseaseObj){
+   
+  
+  voyAGErObj <- list()
+  
+  # Cell Type enrichment
+  voyAGErObj[["fisherTest_cellComposition"]] <- getEnrichment_all(moduleObjlist,SigGenes_Obj, genes_to_keepList)
+  
+  # Eigengene per sample
+  voyAGErObj[["moduleExpression"]] <-  formatEigengenes(eigengeneObjList, GTExobj)
+
+  # GSEA results
+   voyAGErObj[["moduleEnrichment"]] <-  PathwayEnrichmentGetter(moduleObjlist, DBPathwaysObj, genes_to_keepList)
+
+  # moduleGeneList
+  voyAGErObj[["moduleGeneList"]] <- moduleObjlist
+
+  # sources for cell type signatures
+  voyAGErObj[["sources"]] <-  as.data.frame(getSources())
+
+  # diseaseEnrichment
+  voyAGErObj[["diseaseEnrichment"]] <-  diseaseEnrichmentGetter_disgenet2r(moduleObj_list =moduleObjlist, genes_to_keep_list = genes_to_keepList )
+
+  # diseaseEnrichmentManual
+  voyAGErObj[["diseaseEnrichmentManual"]] <-  diseaseEnrichmentGetter_manual(moduleObj_list = moduleObjlist, DBdiseasesObj =DBDiseaseObj, genes_to_keep_list = genes_to_keepList )
+
+  # contigencyTable with two levels, for genes in the pathways and diseases
+   voyAGErObj[["contigencyTable"]] <-  list("diseaseEnrichmentManual"=DiseaseContingencyTableR(moduleObj_list = moduleObjlist, DBDiseaseObj =DBDiseaseObj, genes_to_keep_list = genes_to_keepList ),
+                                            "moduleEnrichment"=PathwayContingencyTableR(moduleObj_list =moduleObjlist,DBPathwaysObj = DBPathwaysObj, genes_to_keep_list = genes_to_keepList  ))
+  
+  
+  return(voyAGErObj)
+  
+}
+```
+
+
+```{r warning=F}
+moduleObjlist <- list(modulesBC, modulesMS, modulesHLV, modulesWB)
+names(moduleObjlist) <- c("Brain - Cortex", "Muscle - Skeletal", "Heart - Left Ventricle", "Whole Blood")
+
+eigengeneObjList <- list(eigengenesBC, eigengenesMS, eigengenesHLV, eigengenesWB)
+names(eigengeneObjList) <- c("Brain - Cortex", "Muscle - Skeletal", "Heart - Left Ventricle", "Whole Blood")
+
+
+genes_to_keepList <- list(genes_to_keep_BC, genes_to_keep_MS, genes_to_keep_HLV, genes_to_keep_WB)
+names(genes_to_keepList) <- c("Brain - Cortex", "Muscle - Skeletal", "Heart - Left Ventricle", "Whole Blood")
+
+DBPathways <- readRDS("AppData/DBPathways.RDS")
+Cluster_Reactome <- readRDS("AppData/Cluster_Reactome.RDS")
+DBPathways_subset <- DBPathways[Cluster_Reactome$pathways]
+ 
+options(error=recover)
+
+voyAGErObj <- build_moduleObj(GTExobj=GTEx.object, moduleObjlist=moduleObjlist, SigGenes_Obj=SigGenes_Obj, eigengeneObjList=eigengeneObjList, genes_to_keepList=genes_to_keepList, DBPathwaysObj = DBPathways_subset, DBDiseaseObj = disease_genesets_subset)
+  
+saveRDS(voyAGErObj, "AppData/moduleInfo_Corrected_Atlas_v4.RDS")
+```
+
+
+
+## donorCondition
+```{r}
+# load conditionID (description of variables from GTEx)
+
+conditionID <- readRDS("auxiliary_files/conditionID.RDS")
+
+donorCondition <- metadata[,c("SAMPID",as.vector(conditionID$ID))]
+colnames(donorCondition) <- c("SAMPID",as.vector(conditionID$description))
+
+saveRDS(donorCondition, "AppData/donorCondition.RDS")
+```
+
+## DT_NbTissuePerGene
+```{r}
+# Sample list of data frames
+# Sample nested list
+
+# Extract logCPM for each tissue
+logCPM_list <- lapply(GTEx.object, function(tissue_data) tissue_data$logCPM)
+ 
+# Get genes from each data frame
+logCPM_list <- lapply(logCPM_list, function(df) rownames(df))
+
+# Get all unique genes
+all_genes <- unique(unlist(logCPM_list))
+
+# Create an empty data frame to store results
+DT_NbTissuePerGene <- data.frame(Gene = character(0), Number_of_Tissues = integer(0), Tissues = character(0))
+
+# For each gene, determine which tissues it appears in and add to the result data frame
+for (gene in all_genes) {
+  tissues_present <- names(logCPM_list)[sapply(logCPM_list, function(genes) gene %in% genes)]
+  collapsed_tissues <- paste("c(", paste(shQuote(tissues_present, type = "cmd"), collapse = ","), ")", sep = "")
+  DT_NbTissuePerGene <- rbind(DT_NbTissuePerGene, data.frame(gene = gene, 
+                                           NbTissue = length(tissues_present), 
+                                           tissue = collapsed_tissues))
+}
+
+   
+# Use the Ensembl dataset for human genes
+mart <- useDataset("hsapiens_gene_ensembl", useMart("ensembl"))
+
+# Fetch all gene names and descriptions
+genes_info <- getBM(attributes=c('external_gene_name', 'description'), mart=mart)
+ 
+
+genes_info <- getBM(attributes=c('external_gene_name', 'description'), 
+                    filters = 'external_gene_name', 
+                    values = DT_NbTissuePerGene$gene, 
+                    mart = mart)
+
+genes_info$description <- sub(" \\[Source:.*$", "", genes_info$description)
+colnames(genes_info) <- c("gene","info")
+
+DT_NbTissuePerGene <- merge(DT_NbTissuePerGene,genes_info, by="gene", all.x=TRUE)
+DT_NbTissuePerGene$gene <- factor(DT_NbTissuePerGene$gene)
+
+
+DT_NbTissuePerGene <- DT_NbTissuePerGene[!duplicated(DT_NbTissuePerGene),]
+DT_NbTissuePerGene <- DT_NbTissuePerGene[!duplicated(DT_NbTissuePerGene$gene),]
+
+
+saveRDS(DT_NbTissuePerGene, "AppData/DT_NbTissuePerGene.RDS")
+```
+
+
+
+```{r}
+
+# Extract logCPM for each tissue
+logCPM_list <- lapply(GTEx.object, function(tissue_data) tissue_data$logCPM)
+ 
+# Get genes from each data frame
+logCPM_list <- lapply(logCPM_list, function(df) rownames(df))
+
+# Get all unique genes
+all_genes <- unique(unlist(logCPM_list))
+ # Initialize an empty list to store each individual data frame
+list_of_results <- list()
+
+# For each gene, determine which tissues it appears in and store the result in the list
+for (gene in all_genes) {
+  tissues_present <- names(logCPM_list)[sapply(logCPM_list, function(genes) gene %in% genes)]
+  gene_df <- data.frame(gene = gene, 
+                        NbTissue = length(tissues_present),
+                        tissue = I(list(tissues_present)))
+  list_of_results[[gene]] <- gene_df
+}
+
+# Bind all data frames in the list into one data frame
+DT_NbTissuePerGene <- bind_rows(list_of_results)
+
+# Use the Ensembl dataset for human genes
+mart <- useDataset("hsapiens_gene_ensembl", useMart("ensembl"))
+
+# Fetch all gene names and descriptions
+genes_info <- getBM(attributes=c('external_gene_name', 'description'), mart=mart)
+ 
+
+genes_info <- getBM(attributes=c('external_gene_name', 'description'), 
+                    filters = 'external_gene_name', 
+                    values = DT_NbTissuePerGene$gene, 
+                    mart = mart)
+
+genes_info$description <- sub(" \\[Source:.*$", "", genes_info$description)
+colnames(genes_info) <- c("gene","info")
+
+DT_NbTissuePerGene <- merge(DT_NbTissuePerGene,genes_info, by="gene", all.x=TRUE)
+DT_NbTissuePerGene$gene <- factor(DT_NbTissuePerGene$gene)
+
+saveRDS(DT_NbTissuePerGene, "AppData/DT_NbTissuePerGene.RDS")
+```
+
+## technicalCondition
+
+```{r}
+technicalCondition <- metadata[,c("SAMPID","SMATSSCR","SMCENTER","SMRIN")]
+
+colnames(technicalCondition) <- c("SAMPID" ,"Autolysis Score (destruction of organism cells or tissues by the organisms' own enzymes or processes)", "Collection site", "RNA integrity number")
+
+technicalCondition$`Autolysis Score (destruction of organism cells or tissues by the organisms' own enzymes or processes)` <- ifelse(technicalCondition$`Autolysis Score (destruction of organism cells or tissues by the organisms' own enzymes or processes)`==0,"None",                                                                                                                            ifelse(technicalCondition$`Autolysis Score (destruction of organism cells or tissues by the organisms' own enzymes or processes)`==1,"Mild",                                                                                                                      ifelse(technicalCondition$`Autolysis Score (destruction of organism cells or tissues by the organisms' own enzymes or processes)`==2,"Moderate",                                                                                      ifelse(technicalCondition$`Autolysis Score (destruction of organism cells or tissues by the organisms' own enzymes or processes)`==3, "Severe", NA))))
+
+saveRDS(technicalCondition, "AppData/technicalCondition.RDS")
+```
+
+## AgeWaves_acrossTissues_step0.5years fake (for visualization in app only)
+
+```{r}
+tissues <- names(GTEx.object.BEcorrected)
+names(AgeWaves_acrossTissues_step0.5years)
+
+
+
+auxAge <- as.data.frame(matrix(0,nrow = length(tissues), ncol = ncol(AgeWaves_acrossTissues_step0.5years$Age)))
+
+nrows <- length(tissues)
+ncols <- ncol(AgeWaves_acrossTissues_step0.5years$Age)
+matAge <- as.data.frame(matrix(-log10(runif(nrows * ncols)), nrow=nrows, ncol=ncols))
+row.names(matAge) <- tissues
+colnames(matAge) <- colnames(AgeWaves_acrossTissues_step0.5years$Age)
+
+nrows <- length(tissues)
+ncols <- ncol(AgeWaves_acrossTissues_step0.5years$Age)
+matAge <- as.data.frame(matrix(-log10(runif(nrows * ncols)), nrow=nrows, ncol=ncols))
+row.names(matAge) <- tissues
+colnames(matAge) <- colnames(AgeWaves_acrossTissues_step0.5years$Age)
+
+nrows <- length(tissues)
+ncols <- ncol(AgeWaves_acrossTissues_step0.5years$Gender)
+matGender <- as.data.frame(matrix(-log10(runif(nrows * ncols)), nrow=nrows, ncol=ncols))
+row.names(matGender) <- tissues
+colnames(matGender) <- colnames(AgeWaves_acrossTissues_step0.5years$Gender)
+
+nrows <- length(tissues)
+ncols <- ncol(AgeWaves_acrossTissues_step0.5years$Int_Age_Gender)
+matInt_Age_Gender <- as.data.frame(matrix(-log10(runif(nrows * ncols)), nrow=nrows, ncol=ncols))
+row.names(matInt_Age_Gender) <- tissues
+colnames(matInt_Age_Gender) <- colnames(AgeWaves_acrossTissues_step0.5years$Int_Age_Gender)
+
+AgeWaves_acrossTissues_step0.5years_fake <- list(Age=matAge,
+                                                 Gender=matGender,
+                                                 Int_Age_Gender=matInt_Age_Gender)
+
+saveRDS(AgeWaves_acrossTissues_step0.5years_fake,"AppData/AgeWaves_acrossTissues_step0.5years_fake.RDS")
+ 
+```
+
+
+## FDR_Interpolation_Tissue
+
+```{r}
+# To check if it makes sense
+
+FDRdata <- readRDS("AppData/peaks_plot_2.RDS")
+
+FDRdata_Age <- FDRdata[FDRdata$variable=="Gender" & FDRdata$tissue=="Breast - Mammary Tissue",]
+FDRdata_Age <- FDRdata_Age[,c("age", "pvalue")]
+FDRdata_Age$var <- rep("real",nrow(FDRdata_Age))
+
+ApproxAge <- approx(FDRdata_Age$age, FDRdata_Age$pvalue, xout=seq(26,64,0.5))
+ApproxAge <- data.frame(age=ApproxAge$x, pvalue=ApproxAge$y)
+ApproxAge$var <- rep("approx",nrow(ApproxAge))
+
+
+data_to_plot <- rbind(FDRdata_Age, ApproxAge)
+ggplot(data_to_plot, aes(x=age, y=pvalue, color=var)) +
+  geom_point() + geom_line()
+
+
+
+# create matrix for heatmap
+AgeWaves_Interpolation <- list()
+
+for (variable in unique(FDRdata$variable)){
+  
+  AgeWaves_Interpolation[[variable]] <- data.frame(NULL)
+  tissues <- unique(FDRdata[FDRdata$variable==variable,]$tissue)
+  for (tissue in tissues){
+    
+    FDRdata_subset <- FDRdata[FDRdata$variable == variable & FDRdata$tissue==tissue,c("age", "pvalue")]
+    ApproxData_pertissue <- approx(x=FDRdata_subset$age, y=FDRdata_subset$pvalue, xout=seq(26,64,0.5))$y
+    
+    AgeWaves_Interpolation[[variable]] <- rbind(AgeWaves_Interpolation[[variable]], ApproxData_pertissue)
+    
+  }
+  
+   
+  AgeWaves_Interpolation[[variable]] <- as.data.frame(-log10(AgeWaves_Interpolation[[variable]]))
+  colnames(AgeWaves_Interpolation[[variable]]) <- as.character(seq(26,64,0.5))
+  row.names(AgeWaves_Interpolation[[variable]]) <- tissues
+}
+
+
+saveRDS(AgeWaves_Interpolation,"AppData/FDR_Interpolation_Tissue.RDS")
+```
+ 
+# Session info
+
+```{r}
+sessionInfo()
+```
+
+R version 4.1.2 (2021-11-01)
+Platform: x86_64-pc-linux-gnu (64-bit)
+Running under: Ubuntu 18.04.6 LTS
+
+Matrix products: default
+BLAS:   /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.7.1
+LAPACK: /usr/lib/x86_64-linux-gnu/lapack/liblapack.so.3.7.1
+
+locale:
+ [1] LC_CTYPE=en_US.UTF-8       LC_NUMERIC=C               LC_TIME=en_US.UTF-8        LC_COLLATE=en_US.UTF-8    
+ [5] LC_MONETARY=en_US.UTF-8    LC_MESSAGES=en_US.UTF-8    LC_PAPER=en_US.UTF-8       LC_NAME=C                 
+ [9] LC_ADDRESS=C               LC_TELEPHONE=C             LC_MEASUREMENT=en_US.UTF-8 LC_IDENTIFICATION=C       
+
+attached base packages:
+[1] stats     graphics  grDevices utils     datasets  methods   base     
+
+other attached packages:
+[1] edgeR_3.36.0 limma_3.50.3
+
+loaded via a namespace (and not attached):
+ [1] Rcpp_1.0.10      pillar_1.9.0     compiler_4.1.2   ggpubr_0.5.0     tools_4.1.2      digest_0.6.31    evaluate_0.20   
+ [8] lifecycle_1.0.3  tibble_3.2.1     gtable_0.3.3     lattice_0.20-45  pkgconfig_2.0.3  rlang_1.1.0      cli_3.6.1       
+[15] rstudioapi_0.14  yaml_2.3.7       xfun_0.37        fastmap_1.1.0    gridExtra_2.3    dplyr_1.1.1      knitr_1.42      
+[22] generics_0.1.3   vctrs_0.6.1      locfit_1.5-9.7   grid_4.1.2       cowplot_1.1.1    tidyselect_1.2.0 glue_1.6.2      
+[29] R6_2.5.1         rstatix_0.7.2    fansi_1.0.4      rmarkdown_2.20   carData_3.0-5    tidyr_1.3.0      ggplot2_3.4.2   
+[36] purrr_1.0.1      car_3.1-1        magrittr_2.0.3   htmltools_0.5.4  scales_1.2.1     backports_1.4.1  abind_1.4-5     
+[43] colorspace_2.1-0 ggsignif_0.6.4   utf8_1.2.3       munsell_0.5.0    broom_1.0.4  

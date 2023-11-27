@@ -148,6 +148,33 @@ shinyServer(
       result
     })
     
+    # _2 because it is for the tissue tab, alteration has a different id
+    fit_abline_2 <- reactive({
+      gene <- selectedGene()
+      variable <- input$variable_model_2
+      tissue <- input$tissue_2
+      validate(need(!is.null(tissue) & tissue != "" & tissue != "All tissues", ""))
+      modifiedTissuename <- gsub("-", "_", tissue)
+      modifiedTissuename <- gsub(" ", "", modifiedTissuename)
+      modifiedTissuename <- gsub("\\(", "", modifiedTissuename)
+      modifiedTissuename <- gsub("\\)", "", modifiedTissuename)
+      
+      if (tissue %in% c("Ovary", "Uterus", "Vagina", "Prostate", "Fallopian Tube", "Testis") & variable %in% c("Gender", "Int_Age_Gender"))
+      {
+        result <- NULL
+      } else
+      {
+        
+        #RDS files online
+        result <- readRDS(paste("data/DB_pvalue_ShARP-LM_EntireAgeRange_abline/",
+                                modifiedTissuename, "_", variable, ".RDS",
+                                sep = ""))
+        #result <- result[result$gene == gene,]
+        result <- result[, -c(4)]
+      }
+      result
+    })
+    
     
     #significance and t value for a single gene, tissue and variable
     Sig_Mag_Gene_perTissueVariable <- reactive({
@@ -176,6 +203,34 @@ shinyServer(
       result
     })
     
+    
+    #significance and t value for a single gene, tissue and variable
+    # _2 because it is for the tissue tab, alteration has a different id
+    Sig_Mag_Gene_perTissueVariable_2 <- reactive({
+      gene <- selectedGene()
+      variable <- input$variable_model_2
+      tissue <- input$tissue_2
+      validate(need(!is.null(tissue) & tissue != "" & tissue != "All tissues", ""))
+      modifiedTissuename <- gsub("-", "_", tissue)
+      modifiedTissuename <- gsub(" ", "", modifiedTissuename)
+      modifiedTissuename <- gsub("\\(", "", modifiedTissuename)
+      modifiedTissuename <- gsub("\\)", "", modifiedTissuename)
+      
+      if (tissue %in% c("Ovary", "Uterus", "Vagina", "Prostate", "Fallopian Tube", "Testis") & variable %in% c("Gender", "Int_Age_Gender"))
+      {
+        result <- NULL
+      } else
+      {
+        
+        #RDS files online
+        result <- readRDS(paste("data/DB_pvalue_ShARP-LM_EntireAgeRange/",
+                                modifiedTissuename, "_", variable, ".RDS",
+                                sep = ""))
+        #result <- result[result$gene == gene,]
+        result <- result[, -c(4)]
+      }
+      result
+    })
     
 
     #p gather significance for all genes given a tissue and a variable
@@ -710,9 +765,9 @@ shinyServer(
 
       variable <- input$variable_model_2
       variable <- ifelse(variable == "Age", "Age", ifelse(variable == "Gender", "Sex", "Age&Sex")) #change name for download filename
-      statsAllAges <- Sig_Mag_Gene_perTissueVariable()[Sig_Mag_Gene_perTissueVariable()$gene==gene,]
-      ablineAllAges <- fit_abline()[fit_abline()$gene==gene,]
-      
+      statsAllAges <- Sig_Mag_Gene_perTissueVariable_2()[Sig_Mag_Gene_perTissueVariable_2()$gene==gene,]
+      ablineAllAges <- fit_abline_2()[fit_abline_2()$gene==gene,]
+
       g <- Line_pvaluevsAge(gene = gene, pvalueData = pvalueData, geneData = geneData_Tissue(), allAges = statsAllAges, abline=ablineAllAges, tissue = tissue, coloredBy = coloredBy) %>%
         hc_title(text = gene) #%>%
         #hc_subtitle(text = geneInfo)
