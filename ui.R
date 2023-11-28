@@ -33,7 +33,7 @@ shinyUI(fluidPage(
                                             tabPanel("Overview", 
                                                      icon = icon("comments"),
                                                      column(width = 12, style = "margin-bottom:50px",
-                                                            HTML('<center><img src="MainFigure.png" height="550"></center>')
+                                                            HTML('<center><img src="MainFigure_2.png" height="550"></center>')
                                                      ),
                                                      tags$footer(tags$a(href = 'http://imm.medicina.ulisboa.pt/group/distrans/',
                                                                         img(src = 'imm_logo.png', title = "Lab Webpage", height = "45px"), target = "blank"),
@@ -58,7 +58,7 @@ shinyUI(fluidPage(
                                                                           font-size: 16px;
                                                                         }'))
                                                      ),
-                                                     HTML('<div class="bottom-right-text"><i class="fa fa-github"></i><a href="https://github.com/DiseaseTranscriptomicsLab/voyAGEr/tree/main" target="_blank"> Version 2.0.0 (November 2023) </a></div>')
+                                                     HTML('<div class="bottom-right-text"><i class="fa fa-github"></i><a href="https://github.com/DiseaseTranscriptomicsLab/voyAGEr/tree/main" target="_blank"> Version 2.0.1 (December 2023) </a></div>')
                                             ),
                                             tabPanel("Methodology",
                                                      icon = icon("cogs"),
