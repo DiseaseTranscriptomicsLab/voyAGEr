@@ -69,7 +69,7 @@ shinyUI(fluidPage(
                                                        <br>The derived statistics enable to identify the age periods when major gene expression changes occur due to which of the 3 effects and to evaluate their functional enrichment.</font>")
                                                      ),
                                                      tags$footer(tags$a(href = 'http://imm.medicina.ulisboa.pt/group/distrans/',
-                                                                        img(src = 'imm_logo.png', title = "Lab Webpage", height = "45px"), target = "blank"),
+                                                                        img(src = 'imm_logo.png', title = "Lab Webpage", height = "45px"), target = "blank"), 
                                                                  HTML(""),
                                                                  tags$a(href = 'https://www.genomept.pt/',
                                                                         img(src = 'genomept.png', title = "Consortium Webpage", height = "40px",
