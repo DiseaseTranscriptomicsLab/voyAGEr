@@ -81,20 +81,20 @@ runApp()
 
 ### Docker 
 
-To launch the voyAGEr Shiny app, replicate the following commands in the terminal:
+To launch the voyAGEr Shiny app, replicate the following commands in the terminal. You may choose to generate the image locally, or pull the available images from DocherHub.
 
-1. Download the GitHub repository to your computer:
+#### Generate Docker image locally
+
+1. Download .zip file
 
 ```bash
 
 wget "https://github.com/DiseaseTranscriptomicsLab/voyAGEr/archive/refs/heads/main.zip"
-
-# For windows users without wget and unzip
-# Make sure the downloaded file is unzipped
 # curl -L "https://github.com/DiseaseTranscriptomicsLab/voyAGEr/archive/refs/heads/main.zip" -o main.zip
-
 unzip main.zip
 cd voyAGEr-main
+
+# Alternatively, download the .zip file directly from the GitHub repository page, and unzip manually
 
 ```
 
@@ -106,15 +106,24 @@ docker build . -t diseasetranscriptomicslab/voyager
 
 ```
 
-3. Run the container:
+#### Pull Image from DockerHub
+
+Pull the latest version of the image from [DockerHub](https://hub.docker.com/repository/docker/diseasetranscriptomicslab/voyager/general):
 
 ```bash
 
-docker run -d -p 8787:8787 -p 3838:3838 diseasetranscriptomicslab/voyager
+docker pull diseasetranscriptomicslab/voyager:v2.0.0
 
 ```
 
-4. Open the voyAGEr app via the web browser at http://localhost:3838
+#### Launch voyAGEr app
+ 
+```bash
+
+docker run -p 3838:3838 -v /path/to/data/:/home/app/data diseasetranscriptomicslab/voyager:v2.0.0
+
+```
+Open the voyAGEr app via the web browser at http://localhost:3838
 
 
 
