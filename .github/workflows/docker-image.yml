@@ -26,6 +26,14 @@ jobs:
         uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
         with:
           images: ${{ secrets.DOCKERHUB_USERNAME }}/voyager
+
+      - name: Debugging Output
+        run: |
+          echo "Current branch: $GITHUB_REF"
+          echo "GitHub event: $GITHUB_EVENT_NAME"
+          echo "Meta tags: ${{ steps.meta.outputs.tags }}"
+          echo "Meta labels: ${{ steps.meta.outputs.labels }}"
+        if: always()
   
       - name: Build and push Docker image
         uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
