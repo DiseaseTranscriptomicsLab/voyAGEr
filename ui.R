@@ -26,7 +26,7 @@ shinyUI(fluidPage(
                            "))),
   navbarPage(title = "voyAGEr", theme = shinytheme("flatly"),
              tabPanel("", #title of the tab 
-                      tags$style(HTML(".big_icon_test {margin-top:-5px; font-size: 25px; }")), #chnage size icon
+                      tags$style(HTML(".big_icon_test {margin-top:-5px; font-size: 25px; }")), #change size icon
                       icon = icon(name = "home", class = "big_icon_test"),
                       mainPanel(width = 12,
                                 tabsetPanel(id = "home", type = "pills",
@@ -69,7 +69,7 @@ shinyUI(fluidPage(
                                                        <br>The derived statistics enable to identify the age periods when major gene expression changes occur due to which of the 3 effects and to evaluate their functional enrichment.</font>")
                                                      ),
                                                      tags$footer(tags$a(href = 'http://imm.medicina.ulisboa.pt/group/distrans/',
-                                                                        img(src = 'imm_logo.png', title = "Lab Webpage", height = "45px"), target = "blank"),
+                                                                        img(src = 'imm_logo.png', title = "Lab Webpage", height = "45px"), target = "blank"), 
                                                                  HTML(""),
                                                                  tags$a(href = 'https://www.genomept.pt/',
                                                                         img(src = 'genomept.png', title = "Consortium Webpage", height = "40px",
