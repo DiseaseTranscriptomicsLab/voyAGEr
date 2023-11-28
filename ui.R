@@ -26,7 +26,7 @@ shinyUI(fluidPage(
                            "))),
   navbarPage(title = "voyAGEr", theme = shinytheme("flatly"),
              tabPanel("", #title of the tab 
-                      tags$style(HTML(".big_icon_test {margin-top:-5px; font-size: 25px; }")), #chnage size icon
+                      tags$style(HTML(".big_icon_test {margin-top:-5px; font-size: 25px; }")), #change size icon
                       icon = icon(name = "home", class = "big_icon_test"),
                       mainPanel(width = 12,
                                 tabsetPanel(id = "home", type = "pills",
