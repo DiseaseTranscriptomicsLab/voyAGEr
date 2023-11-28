@@ -40,7 +40,7 @@ shinyServer(
 
     #Significance pvalue = f(age) for a single gene across tissue
     #Need to take gene-specific information from DB_pvalue_ShARP-LM.db
-    #p_Alterations gathers signficiance for all tissue for a single genes and vriable
+    #p_Alterations gathers signficiance for all tissue for a single genes and variable
     p_Alterations <- reactive({
        
       gene <- input$gene
