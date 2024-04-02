@@ -2,7 +2,7 @@
 
 > **Original article:**
 >
-> Arthur L. Schneider, Rita M. Silva, Alexandre Kaizeler, Nuno Saraiva-Agostinho and Nuno L. Barbosa-Morais (2023). voyAGEr: free web interface for the analysis of age-related gene expression alterations in human tissues. *eLife*.
+> Arthur L Schneider, Rita Martins-Silva, Alexandre Kaizeler, Nuno Saraiva-Agostinho, Nuno L Barbosa-Morais (2024) voyAGEr, a free web interface for the analysis of age-related gene expression alterations in human tissues *eLife* 12:RP88623.
 
 voyAGEr is a web interface for the analysis of age-related gene expression alterations in GTEx human tissues. The app leverages RNA-seq datasets from the GTEx project (Lonsdale et al., 2013), encompassing tissue samples from hundreds of donors aged from 20 to 70 years.
 
