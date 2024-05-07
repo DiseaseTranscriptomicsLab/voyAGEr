@@ -1,4 +1,6 @@
-This repository contains the corrected logCPM valoes for each tissue analysed in voyAGEr. Data preprocessing followed the methods outlined in voyAGEr's original paper:
+This repository contains the corrected logCPM values for each tissue analysed in voyAGEr. If you use them for your analysis, please cite the original paper of voyAGEr.
+
+Data preprocessing followed the methods outlined in voyAGEr's original paper:
 
 > Arthur L. Schneider, Rita Martins-Silva, Alexandre Kaizeler, Nuno Saraiva-Agostinho, Nuno L. Barbosa-Morais. (2023). voyAGEr: free web interface for the analysis of age-related gene expression alterations in human tissues. eLife, 12:RP88623.
 
