@@ -2,7 +2,7 @@ This repository contains the corrected logCPM values for each tissue analysed in
 
 Data preprocessing followed the methods outlined in voyAGEr's original paper:
 
-> Arthur L. Schneider, Rita Martins-Silva, Alexandre Kaizeler, Nuno Saraiva-Agostinho, Nuno L. Barbosa-Morais. (2023). voyAGEr: free web interface for the analysis of age-related gene expression alterations in human tissues. eLife, 12:RP88623.
+> Arthur L. Schneider, Rita Martins-Silva, Alexandre Kaizeler, Nuno Saraiva-Agostinho, Nuno L. Barbosa-Morais. (2024). voyAGEr: free web interface for the analysis of age-related gene expression alterations in human tissues. eLife, 12:RP88623.
 
 In summary, the RNA-seq read count matrix for each gene in GTEx v8 samples was obtained from the project’s data portal (https://www.gtexportal.org/). 
 Out of the 54 available tissues, five with fewer than 50 samples (kidney medulla, fallopian tube, bladder, ectocervix, and endocervix) were excluded.
