@@ -58,7 +58,7 @@ shinyUI(fluidPage(
                                                                           font-size: 16px;
                                                                         }'))
                                                      ),
-                                                     HTML('<div class="bottom-right-text"><i class="fa fa-github"></i><a href="https://github.com/DiseaseTranscriptomicsLab/voyAGEr/tree/main" target="_blank"> Version 2.0.1 (December 2023) </a></div>')
+                                                     HTML('<div class="bottom-right-text"><i class="fa fa-github"></i><a href="https://github.com/DiseaseTranscriptomicsLab/voyAGEr/tree/main" target="_blank"> Version 2.0.2 (October 2024) </a></div>')
                                             ),
                                             tabPanel("Methodology",
                                                      icon = icon("cogs"),
