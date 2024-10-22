@@ -1,12 +1,8 @@
+FROM debian:bookworm-slim
 FROM r-base:4.1.0
 MAINTAINER Disease Transcriptomics Lab <imm-nmorais@medicina.ulisboa.pt>
-
-# Use a pre-configured debian base image that supports merged-/usr
-FROM debian:bookworm-slim
-
-# Continue with your installation and upgrade steps
+ 
 RUN apt-get update && apt-get -y upgrade && apt-get -y autoremove
-
 RUN apt-get install -y curl
 RUN apt-get install -y libcurl4-openssl-dev
 RUN apt-get install -y libssl-dev
