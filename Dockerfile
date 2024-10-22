@@ -1,4 +1,4 @@
-FROM r-base:4.1.0
+FROM r-base:4.1.2
 MAINTAINER Disease Transcriptomics Lab <imm-nmorais@medicina.ulisboa.pt>
 
 RUN apt-get update && apt-get -y upgrade && apt-get -y autoremove
