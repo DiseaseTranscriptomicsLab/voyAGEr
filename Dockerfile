@@ -1,7 +1,7 @@
 FROM r-base:4.1.0
 MAINTAINER Disease Transcriptomics Lab <imm-nmorais@medicina.ulisboa.pt>
 
-FROM debian:bookworm-slim
+FROM debian:bullseye-slim
 RUN which R
 RUN apt-get update && apt-get -y upgrade && apt-get -y autoremove
 RUN apt-get install -y curl
