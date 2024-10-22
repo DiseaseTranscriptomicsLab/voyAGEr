@@ -1,14 +1,7 @@
 FROM r-base:4.1.0
 MAINTAINER Disease Transcriptomics Lab <imm-nmorais@medicina.ulisboa.pt>
 
-RUN apt-get update && \
-    apt-get -y install --no-install-recommends \
-        curl \
-        git \
-        build-essential && \
-    apt-get -y autoremove && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get -y upgrade && apt-get -y autoremove
 RUN apt-get install -y curl
 RUN apt-get install -y libcurl4-openssl-dev
 RUN apt-get install -y libssl-dev
