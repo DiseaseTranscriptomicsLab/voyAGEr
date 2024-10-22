@@ -1,4 +1,4 @@
-FROM r-base:4.1.2
+FROM r-base:4.1.0
 MAINTAINER Disease Transcriptomics Lab <imm-nmorais@medicina.ulisboa.pt>
 
 # Use a pre-configured debian base image that supports merged-/usr
