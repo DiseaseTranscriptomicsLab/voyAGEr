@@ -2,7 +2,7 @@ FROM r-base:4.1.0
 MAINTAINER Disease Transcriptomics Lab <imm-nmorais@medicina.ulisboa.pt>
 
 FROM debian:bullseye-slim
-RUN which R
+RUN R --version
 RUN apt-get update && apt-get -y upgrade && apt-get -y autoremove
 RUN apt-get install -y curl
 RUN apt-get install -y libcurl4-openssl-dev
