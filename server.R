@@ -688,7 +688,7 @@ shinyServer(
     })
 
     #Data table of the gene differential expression signgificance
-    output$genePeakTable <- DT::renderDataTable({
+    output$genePeakTable <- DT::renderDataTable(server = FALSE,{
       
       validate(need(!is.null(input$peakClicked), "")) # A peak must be chosen
       tissue <- input$tissue_2
@@ -710,14 +710,17 @@ shinyServer(
                     caption = "Significance for gene expression alteration",
                     selection = "single", #only one row selected at a time
                     #filter = "top", #can filter the results per column
-                    options = list(deferRender = TRUE, scrollY = 600, scroller = TRUE, scollX = T,
+                    options = list(deferRender = FALSE, scrollY = 600, scroller = TRUE, scollX = T,
                                    dom = "Bfti",
                                    buttons = list(list(extend='copy',
-                                                       filename = filename),
+                                                       filename = filename, 
+                                                       exportOptions = list(modifier = list(page = "all"))),
                                                   list(extend='csv',
-                                                       filename = filename),
+                                                       filename = filename, 
+                                                       exportOptions = list(modifier = list(page = "all"))),
                                                   list(extend='excel',
-                                                       filename= filename))),
+                                                       filename= filename, 
+                                                       exportOptions = list(modifier = list(page = "all"))))),
                     colnames = c("Gene", "p-value", "Info"),
                     rownames = T,
                     extensions = c("Scroller", "Buttons")
