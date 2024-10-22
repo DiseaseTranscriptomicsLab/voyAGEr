@@ -1,7 +1,8 @@
 FROM r-base:4.1.2
 MAINTAINER Disease Transcriptomics Lab <imm-nmorais@medicina.ulisboa.pt>
 
-RUN apt-get update && apt-get -y dist-upgrade && apt-get -y autoremove
+RUN sed -i 's|http://deb.debian.org|http://ftp.us.debian.org|g' /etc/apt/sources.list && \
+    apt-get update && apt-get -y upgrade && apt-get -y autoremove
 RUN apt-get install -y curl
 RUN apt-get install -y libcurl4-openssl-dev
 RUN apt-get install -y libssl-dev
