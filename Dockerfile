@@ -5,6 +5,7 @@ RUN apt-get update && apt-get -y upgrade && apt-get -y autoremove
 RUN apt-get install -y curl
 RUN apt-get install -y libcurl4-openssl-dev
 RUN apt-get install -y libssl-dev
+RUN apt-get install -y libglpk40 libglpk-dev
 RUN R -e 'install.packages("shiny")'
 RUN R -e 'install.packages("shinycssloaders")'
 RUN R -e 'install.packages("ggplot2")'
