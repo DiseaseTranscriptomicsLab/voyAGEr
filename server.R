@@ -42,10 +42,10 @@ shinyServer(
     #Need to take gene-specific information from DB_pvalue_ShARP-LM.db
     #p_Alterations gathers signficiance for all tissue for a single genes and variable
     p_Alterations <- reactive({
-       
+
       gene <- input$gene
       variable <- input$variable_Gene_Alteration
-      validate(need(!is.null(gene) & gene != "", "")) 
+      validate(need(!is.null(gene) & gene != "", ""))
       tissue <- geneList$tissue[[match(gene, geneList$gene)]]
       modifiedTissuename <- gsub("-", "_", tissue)
       modifiedTissuename <- gsub(" ", "", modifiedTissuename)
@@ -71,13 +71,13 @@ shinyServer(
                                variable, ".RDS", sep = ""))
           #gene <- gsub("-", "_", gene) # '-' creates issues when calling database so '-' were replaced by "_" in the database's names
           #gene <- gsub("\\.", "_", gene) # '.' creates issues when calling database so '-' were replaced by "_" in the database's names
-          
+
           tmp <- tmp[tmp$gene == gene,]
           tmp <- tmp[, -1]
           tmp <- -log10(tmp)
-          
-    
-          
+
+
+
           fit <- smooth.spline(as.numeric(colnames(tmp)), tmp)
           fit <- predict(fit, seq(26, 64, by = 0.5))$y
           tmp <- data.frame(t(fit))
@@ -120,7 +120,7 @@ shinyServer(
       }
       pvalueData
     })
-    
+
     # coefs linear model per gene, fit ShARP-LM per gene in entire age range, per condition
     fit_abline <- reactive({
       gene <- input$gene
@@ -131,13 +131,13 @@ shinyServer(
       modifiedTissuename <- gsub(" ", "", modifiedTissuename)
       modifiedTissuename <- gsub("\\(", "", modifiedTissuename)
       modifiedTissuename <- gsub("\\)", "", modifiedTissuename)
-      
+
       if (tissue %in% c("Ovary", "Uterus", "Vagina", "Prostate", "Fallopian Tube", "Testis") & variable %in% c("Gender", "Int_Age_Gender"))
       {
         result <- NULL
       } else
       {
-        
+
         #RDS files online
         result <- readRDS(paste("data/DB_pvalue_ShARP-LM_EntireAgeRange_abline/",
                                 modifiedTissuename, "_", variable, ".RDS",
@@ -147,7 +147,7 @@ shinyServer(
       }
       result
     })
-    
+
     # _2 because it is for the tissue tab, alteration has a different id
     fit_abline_2 <- reactive({
       gene <- selectedGene()
@@ -158,13 +158,13 @@ shinyServer(
       modifiedTissuename <- gsub(" ", "", modifiedTissuename)
       modifiedTissuename <- gsub("\\(", "", modifiedTissuename)
       modifiedTissuename <- gsub("\\)", "", modifiedTissuename)
-      
+
       if (tissue %in% c("Ovary", "Uterus", "Vagina", "Prostate", "Fallopian Tube", "Testis") & variable %in% c("Gender", "Int_Age_Gender"))
       {
         result <- NULL
       } else
       {
-        
+
         #RDS files online
         result <- readRDS(paste("data/DB_pvalue_ShARP-LM_EntireAgeRange_abline/",
                                 modifiedTissuename, "_", variable, ".RDS",
@@ -174,8 +174,8 @@ shinyServer(
       }
       result
     })
-    
-    
+
+
     #significance and t value for a single gene, tissue and variable
     Sig_Mag_Gene_perTissueVariable <- reactive({
       gene <- input$gene
@@ -186,13 +186,13 @@ shinyServer(
       modifiedTissuename <- gsub(" ", "", modifiedTissuename)
       modifiedTissuename <- gsub("\\(", "", modifiedTissuename)
       modifiedTissuename <- gsub("\\)", "", modifiedTissuename)
-      
+
       if (tissue %in% c("Ovary", "Uterus", "Vagina", "Prostate", "Fallopian Tube", "Testis") & variable %in% c("Gender", "Int_Age_Gender"))
       {
         result <- NULL
       } else
       {
- 
+
         #RDS files online
         result <- readRDS(paste("data/DB_pvalue_ShARP-LM_EntireAgeRange/",
                                     modifiedTissuename, "_", variable, ".RDS",
@@ -202,8 +202,8 @@ shinyServer(
       }
       result
     })
-    
-    
+
+
     #significance and t value for a single gene, tissue and variable
     # _2 because it is for the tissue tab, alteration has a different id
     Sig_Mag_Gene_perTissueVariable_2 <- reactive({
@@ -215,13 +215,13 @@ shinyServer(
       modifiedTissuename <- gsub(" ", "", modifiedTissuename)
       modifiedTissuename <- gsub("\\(", "", modifiedTissuename)
       modifiedTissuename <- gsub("\\)", "", modifiedTissuename)
-      
+
       if (tissue %in% c("Ovary", "Uterus", "Vagina", "Prostate", "Fallopian Tube", "Testis") & variable %in% c("Gender", "Int_Age_Gender"))
       {
         result <- NULL
       } else
       {
-        
+
         #RDS files online
         result <- readRDS(paste("data/DB_pvalue_ShARP-LM_EntireAgeRange/",
                                 modifiedTissuename, "_", variable, ".RDS",
@@ -231,7 +231,7 @@ shinyServer(
       }
       result
     })
-    
+
 
     #p gather significance for all genes given a tissue and a variable
     p <- reactive({
@@ -254,7 +254,7 @@ shinyServer(
         p <- readRDS(paste("data/DB_pvalue_ShARP-LM/",
                            modifiedTissuename, "_", input$variable_model_2,
                            ".RDS", sep = ""))
- 
+
         rownames(p) <- p$gene
         p <- p[,-1]
       }
@@ -269,9 +269,9 @@ shinyServer(
     technicalCondition <- readRDS("data/technicalCondition.RDS")
     Cluster_Reactome <- readRDS("data/Cluster_Reactome.RDS")
     Cluster_Reactome_affiliation <- readRDS("data/Reactome_cluster_Affiliation.RDS")
-    moduleInfo <- readRDS("data/moduleInfo_Corrected_Atlas_v4.RDS") 
-    
-    
+    moduleInfo <- readRDS("data/moduleInfo_Corrected_Atlas_v4.RDS")
+
+
     # color2 <- c("#8DD3C7", "#FFFFB3", "#FB8072", "#80B1D3", "#FDB462", "#B3DE69", "#FCCDE5", "#D9D9D9", "#BC80BD", "#CCEBC5", "#FFED6F",
     #             "#7FC97F", "#BEAED4", "#FDC086", "#E6AB02", "#386CB0", "#A6761D", "#F0027F", "#BF5B17", "#666666", "#1B9E77", "#D95F02",
     #             "#7570B3", "#E7298A", "#66A61E", "#FFFF99", "#BEBADA")
@@ -314,7 +314,7 @@ shinyServer(
 
       #Keep the selected tissue if the new gene is expressed in it
       #Otherwise, put the heatmpa wil all tissues
- 
+
       if (input$tissue %in% as.character(geneList$tissue[[match(gene, geneList$gene)]]))
       {
         selected <- input$tissue
@@ -374,20 +374,29 @@ shinyServer(
       validate(need(condition %in% colnames(donorCondition), ""))
       condition <- conditionID$ID[match(condition, conditionID$description)]
       DT::datatable(tmp[, c("conditionID", "pvalue", "padj", "condition")],
-                   escape = F,
-                   selection = list(mode = "none"),
-                   colnames = c("Condition ID", "p-value", "adjusted p-value", "condition"),
-                   rownames = F,
-                   options = list(deferRender = TRUE, scrollY = 400, scroller = TRUE, scollX = T,
-                                  rowCallback = JS(
-                     "function(nRow, aData, iDisplayIndex, iDisplayIndexFull) {",
-                     "var full_text = aData[3]",
-                     "$('td:eq(0)', nRow).attr('title', full_text);",
-                     "}"),
-                     columnDefs = list(list(visible=FALSE, targets=c(3)),
-                                       list(className = 'dt-center', targets = 1:3))
-                     ),
-                   extensions = "Scroller"
+                    escape = FALSE,
+                    selection = list(mode = "none"),
+                    colnames = c("Condition ID", "p-value", "adjusted p-value", "condition"),
+                    rownames = FALSE,
+                    extensions = c("Scroller", "Buttons"),
+                    options = list(
+                      dom = 'Bfrtip',
+                      buttons = c('copy', 'csv', 'excel'),
+                      deferRender = TRUE,
+                      scrollY = 400,
+                      scroller = TRUE,
+                      scrollX = TRUE,
+                      rowCallback = JS(
+                        "function(nRow, aData, iDisplayIndex, iDisplayIndexFull) {",
+                        "var full_text = aData[3];",
+                        "$('td:eq(0)', nRow).attr('title', full_text);",
+                        "}"
+                      ),
+                      columnDefs = list(
+                        list(visible = FALSE, targets = c(3)),
+                        list(className = 'dt-center', targets = 1:3)
+                      )
+                    )
       )
       # #Not working with rowCallback
       # %>% DT::formatStyle("conditionID", 'pvalue',
@@ -403,21 +412,21 @@ shinyServer(
 #Profile
     output$Heatmap_LoessGEvsAge <- renderHighchart({
       gene <- input$gene
- 
+
       # Images not working
       # title <- paste(gene, " ",
       #                "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'> <img src='NCBI.png' title='NCBI' height='30px' style='padding-bottom:5px;'/></a>",
       #                "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'> <img src='geneCards.png' title='GeneCards' height='30px' style='padding-bottom:5px;'/></a>",
       #                sep = "")
-      
+
       title <- paste(gene, " ",
                      "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'>NCBI</a>",
                      " | ",
                      "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'>GeneCards</a>",
                      sep = "")
-      
-      
-      
+
+
+
       #The gene list is loaded faster that the tissue list. In the meantime, an error message appears since no tissue is selcted
       validate(need(input$tissue != "", "")) #avoid the error message
       g <- Heatmap_LoessGEvsAge(geneData())
@@ -435,7 +444,7 @@ shinyServer(
 
 #Alterations
     output$Heatmap_signficanceAlterationsvsAge <- renderHighchart({
-       
+
       gene <- input$gene
       variable <- input$variable_Gene_Alteration
       variable <- ifelse(variable == "Age", "Age", ifelse(variable == "Gender", "Sex", "Age&Sex"))
@@ -494,7 +503,7 @@ shinyServer(
                                                          symbolStrokeWidth = 4,
                                                          symbolSize = 20,
                                                          symbolStroke = '#4D4D4D',
-                                                         symbol = "menu"))) 
+                                                         symbol = "menu")))
 
     })
 
@@ -603,7 +612,7 @@ shinyServer(
       pvalueData <- p_Alteration_gene()
       statsAllAges <- Sig_Mag_Gene_perTissueVariable()[Sig_Mag_Gene_perTissueVariable()$gene==gene,]
       ablineAllAges <- fit_abline()[fit_abline()$gene==gene,]
-      
+
       # title <- paste(gene, " ",
       #                "<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", gene, "' target='_blank'> <img src='NCBI.png' title='NCBI' height='30px' style='padding-bottom:5px;'/></a>",
       #                "<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", gene, "' target='_blank'> <img src='geneCards.png' title='GeneCards' height='30px' style='padding-bottom:5px;'/></a>",
@@ -689,18 +698,18 @@ shinyServer(
 
     #Data table of the gene differential expression signgificance
     output$genePeakTable <- DT::renderDataTable(server = FALSE,{
-      
+
       validate(need(!is.null(input$peakClicked), "")) # A peak must be chosen
       tissue <- input$tissue_2
       variable <- input$variable_model_2
       peakClicked <- input$peakClicked
       validate(need(!is.na(match(peakClicked, colnames(p()))), "")) # Matching column between age and peak must be found (avoid error when change tissue)
       validate(need(input$peakClickedVariable == variable, "")) #When a peak is clicked and the variable is changed, enable to remove the table while no peak is selected from the new polot
-      tmp <- data.frame(gene = as.character(rownames(p())), 
+      tmp <- data.frame(gene = as.character(rownames(p())),
                         pvalue = round(p()[, match(peakClicked, colnames(p()))], 6))
       tmp <- tmp[order(tmp$pvalue),]
       rownames(tmp) <- 1:nrow(tmp)
- 
+
       tmp$Info <- paste(paste0("<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", tmp$gene,"' target='_blank'>", "GeneCards", "</a>"),
                              paste0("<a href='https://www.ncbi.nlm.nih.gov/gene/?term=", tmp$gene,"' target='_blank'>", "NCBI", "</a>"), sep = ", ")
       filename <- paste("DEG_across_", variable, "_", tissue, "_", peakClicked, "yo", sep = "")
@@ -713,13 +722,13 @@ shinyServer(
                     options = list(deferRender = FALSE, scrollY = 600, scroller = TRUE, scollX = T,
                                    dom = "Bfti",
                                    buttons = list(list(extend='copy',
-                                                       filename = filename, 
+                                                       filename = filename,
                                                        exportOptions = list(modifier = list(page = "all"))),
                                                   list(extend='csv',
-                                                       filename = filename, 
+                                                       filename = filename,
                                                        exportOptions = list(modifier = list(page = "all"))),
                                                   list(extend='excel',
-                                                       filename= filename, 
+                                                       filename= filename,
                                                        exportOptions = list(modifier = list(page = "all"))))),
                     colnames = c("Gene", "p-value", "Info"),
                     rownames = T,
@@ -761,7 +770,7 @@ shinyServer(
       validate(need(!is.na(selectedGene()), "Select a gene"))
       validate(need(input$peakClickedVariable == input$variable_model_2, "")) #When a peak is clicked and the variable is changed, enable to remove the plot while no peak is selected from the new polot
       tissue <- input$tissue_2
-      gene <- selectedGene() 
+      gene <- selectedGene()
       pvalueData <- p()
       coloredBy <- input$variable_model_2
       geneInfo <- geneList$info[match(gene, geneList$gene)]
@@ -987,7 +996,7 @@ shinyServer(
       #              data.frame(pathway = Cluster_Reactome_affiliation[[input$familyClicked]][!is.na(Cluster_Reactome_affiliation[[input$familyClicked]][,2]),2]))
 
       tmp <- as.data.frame(as.matrix(c(Cluster_Reactome_affiliation[[input$familyClicked]]$REACTOME.pathways,Cluster_Reactome_affiliation[[input$familyClicked]]$KEGG.GO.pathways),ncol=2))
-      
+
       filename <- paste("voyAGEr_WordCloud_family-", input$familyClicked, sep = '')
       DT::datatable(tmp,
                     escape = F,
@@ -1499,7 +1508,7 @@ validate(need(nrow(moduleCellType[moduleCellType$module == module,]) !=0 , ""))
     output$moduleGeneList <- DT::renderDataTable({
       tmp <- moduleInfo$moduleGeneList[[input$tissue_module]]
       tmp <- data.frame(gene = as.character(tmp[[input$selectedModule]]))
- 
+
       if (nrow(tmp)!=0) #to avoid error message when change of tissue
       {
         tmp$Info <- paste(paste0("<a href='http://www.genecards.org/cgi-bin/carddisp.pl?gene=", tmp$gene,"' target='_blank'>", "GeneCards", "</a>"),
@@ -1553,12 +1562,12 @@ validate(need(nrow(moduleCellType[moduleCellType$module == module,]) !=0 , ""))
     	geneSearchedInModules()
     })
 
-    
-    
-    
-    
-    
-    
+
+
+
+
+
+
   }
 )
 
