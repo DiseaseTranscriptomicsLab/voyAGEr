@@ -6,9 +6,9 @@ library(shinycssloaders)
 library(manipulateWidget)
 library(fontawesome)
 
-sidebarPanel2 <- function (..., out = NULL, width = 4) 
+sidebarPanel2 <- function (..., out = NULL, width = 4)
 {
-  div(class = paste0("col-sm-", width), 
+  div(class = paste0("col-sm-", width),
       tags$form(class = "well", ...),
       out
   )
@@ -25,12 +25,12 @@ shinyUI(fluidPage(
                            }
                            "))),
   navbarPage(title = "voyAGEr", theme = shinytheme("flatly"),
-             tabPanel("", #title of the tab 
+             tabPanel("", #title of the tab
                       tags$style(HTML(".big_icon_test {margin-top:-5px; font-size: 25px; }")), #change size icon
                       icon = icon(name = "home", class = "big_icon_test"),
                       mainPanel(width = 12,
                                 tabsetPanel(id = "home", type = "pills",
-                                            tabPanel("Overview", 
+                                            tabPanel("Overview",
                                                      icon = icon("comments"),
                                                      column(width = 12, style = "margin-bottom:50px",
                                                             HTML('<center><img src="MainFigure_2.png" height="550"></center>')
@@ -41,8 +41,8 @@ shinyUI(fluidPage(
                                                                  tags$a(href = 'https://www.genomept.pt/',
                                                                         img(src = 'genomept.png', title = "Consortium Webpage", height = "40px",
                                                                             style = "padding-right:5px;"),
-                                                                        target = "blank"), 
-                                                                 align = "center", 
+                                                                        target = "blank"),
+                                                                 align = "center",
                                                                  style = "position: fixed;
                                                           left: 0;
                                                           bottom: 0;
@@ -58,24 +58,24 @@ shinyUI(fluidPage(
                                                                           font-size: 16px;
                                                                         }'))
                                                      ),
-                                                     HTML('<div class="bottom-right-text"><i class="fa fa-github"></i><a href="https://github.com/DiseaseTranscriptomicsLab/voyAGEr/tree/main" target="_blank"> Version 2.0.2 (October 2024) </a></div>')
+                                                     HTML('<div class="bottom-right-text"><i class="fa fa-github"></i><a href="https://github.com/DiseaseTranscriptomicsLab/voyAGEr/tree/main" target="_blank"> Version 2.0.3 (July 2025) </a></div>')
                                             ),
                                             tabPanel("Methodology",
                                                      icon = icon("cogs"),
                                                      column(width = 12, style = "margin-bottom:50px",
                                                             HTML('<center><img src="methodology.png" height="400"></center>'),
-                                                            HTML("<font size='4'><br>Our shifting age range pipeline for linear modelling (ShARP-LM) consists in carrying out tissue-specific differential gene expression analyses across samples in age windows spanning 16 years centred in consecutive years of age. 
+                                                            HTML("<font size='4'><br>Our shifting age range pipeline for linear modelling (ShARP-LM) consists in carrying out tissue-specific differential gene expression analyses across samples in age windows spanning 16 years centred in consecutive years of age.
                                                        <br>For each window, the gene expression is linearly modelled considering the age, sex and age-sex interaction effects.
                                                        <br>The derived statistics enable to identify the age periods when major gene expression changes occur due to which of the 3 effects and to evaluate their functional enrichment.</font>")
                                                      ),
                                                      tags$footer(tags$a(href = 'http://imm.medicina.ulisboa.pt/group/distrans/',
-                                                                        img(src = 'imm_logo.png', title = "Lab Webpage", height = "45px"), target = "blank"), 
+                                                                        img(src = 'imm_logo.png', title = "Lab Webpage", height = "45px"), target = "blank"),
                                                                  HTML(""),
                                                                  tags$a(href = 'https://www.genomept.pt/',
                                                                         img(src = 'genomept.png', title = "Consortium Webpage", height = "40px",
                                                                             style = "padding-right:5px;"),
-                                                                        target = "blank"), 
-                                                                 align = "center", 
+                                                                        target = "blank"),
+                                                                 align = "center",
                                                                  style = "position: fixed;
                                                           left: 0;
                                                           bottom: 0;
@@ -86,15 +86,15 @@ shinyUI(fluidPage(
                                             ))
                       )
              ),
-             tabPanel("Gene", 
+             tabPanel("Gene",
                       icon = icon("dna"),
                       sidebarLayout(
                         sidebarPanel2(width = 3,
-                                      pickerInput("gene", label = "Gene", 
-                                                  choices = c("Loading ..." = ""), 
+                                      pickerInput("gene", label = "Gene",
+                                                  choices = c("Loading ..." = ""),
                                                   options = list(`live-search` = TRUE), selected = "CDKN2A"),
-                                      pickerInput("tissue", label = "Tissue", 
-                                                  choices = c("Loading ..." = ""), 
+                                      pickerInput("tissue", label = "Tissue",
+                                                  choices = c("Loading ..." = ""),
                                                   options = list(`live-search` = TRUE),
                                                   choicesOpt = list(content = "<div style='color: red; </div>")),
                                       conditionalPanel(condition = "input.Gene_profile == 'Alteration'",
@@ -102,9 +102,9 @@ shinyUI(fluidPage(
                                                                     choices = list("Age" = "Age", "Sex" = "Gender", "Age&Sex" = "Int_Age_Gender"),
                                                                     checkbox = TRUE)),
                                       conditionalPanel(condition = "input.tissue != 'All tissues' && input.tissue != '' && input.Gene_profile == 'Profile'",
-                                                       awesomeRadio(inputId = "coloredBy", label = "Coloured By", 
+                                                       awesomeRadio(inputId = "coloredBy", label = "Coloured By",
                                                                     choices = c("Loading ...")),
-                                                       awesomeRadio(inputId = "shapedBy", label = "Shaped By", 
+                                                       awesomeRadio(inputId = "shapedBy", label = "Shaped By",
                                                                     choices = c("Loading ...")),
                                                        HTML("<small>*A curve is independently fitted for each of the positive and negative conditions if at least 10 samples are known for each of them. </small>")
                                       ),
@@ -114,7 +114,7 @@ shinyUI(fluidPage(
                                                                     fluidRow(
                                                                       column(width = 8, tags$h4("Condition profiles")),
                                                                       column(width = 4, dropdownButton(
-                                                                        HTML("A statistical test (Kruskal-Wallis) was computed to examine overall difference in gene expression medians between positive and negative conditions. 
+                                                                        HTML("A statistical test (Kruskal-Wallis) was computed to examine overall difference in gene expression medians between positive and negative conditions.
                                                                       The p-values are corrected with the Benjamini & Hochberg approach.
                                                                       <br> Even if the method accounts for the high imbalance between positive and negative samples, results must still be viewed with caution."),
                                                                         circle = TRUE,  size = "sm", inline = T,
@@ -129,21 +129,21 @@ shinyUI(fluidPage(
                                   tabsetPanel(id = "Gene_profile", type = "pills",
                                               tabPanel("Profile",
                                                        icon = icon("chart-line"),
-                                                       conditionalPanel(condition = "input.tissue == 'All tissues' || input.tissue == '' ", 
+                                                       conditionalPanel(condition = "input.tissue == 'All tissues' || input.tissue == '' ",
                                                                         column(width = 12,
                                                                                tags$h4("Gene expression over age across tissues"),
-                                                                               withSpinner(highchartOutput("Heatmap_LoessGEvsAge", height = "800px"), 
+                                                                               withSpinner(highchartOutput("Heatmap_LoessGEvsAge", height = "800px"),
                                                                                            color = "#2C3E50", type = 5, size = 0.5))
                                                        ),
-                                                       conditionalPanel(condition = "input.tissue != 'All tissues' && input.tissue != ''", 
+                                                       conditionalPanel(condition = "input.tissue != 'All tissues' && input.tissue != ''",
                                                                         column(width = 12,
                                                                                tags$h4(""),
                                                                                HTML("For data privacy purposes, a light randomization was attributed to each scattered point along the age axis. The plotted regression line (black) was fitted using the original values."),
-                                                                               withSpinner(highchartOutput("scatterGEvsAge", height = "650px"), 
+                                                                               withSpinner(highchartOutput("scatterGEvsAge", height = "650px"),
                                                                                            color = "#2C3E50", type = 5, size = 0.5),
                                                                                #downloadButton('downloadDataGeneExpression', 'Table'),
                                                                                DT::dataTableOutput("geneExpressionDownload"),
-                                                                               div(DT::dataTableOutput("geneExpression"), style = "font-size: 90%; width: 100%",server = F)) 
+                                                                               div(DT::dataTableOutput("geneExpression"), style = "font-size: 90%; width: 100%",server = F))
                                                        )
                                               ),
                                               tabPanel("Alteration",
@@ -152,10 +152,10 @@ shinyUI(fluidPage(
                                                                         column(width = 12,
                                                                                tags$h4("Gene expression alterations over age across tissues"),
                                                                                HTML("The heatmap color scale represents the significance of the gene expression alterations (log-scaled)."),
-                                                                               withSpinner(highchartOutput("Heatmap_signficanceAlterationsvsAge", height = "800px"), 
+                                                                               withSpinner(highchartOutput("Heatmap_signficanceAlterationsvsAge", height = "800px"),
                                                                                            color = "#2C3E50", type = 5, size = 0.5))
                                                        ),
-                                                       conditionalPanel(condition = "input.tissue != 'All tissues' && input.tissue != ''", 
+                                                       conditionalPanel(condition = "input.tissue != 'All tissues' && input.tissue != ''",
                                                                         column(width = 12,
                                                                                tags$h4("Gene expression alterations over age"),
                                                                                #Description text different for each variable
@@ -177,8 +177,8 @@ shinyUI(fluidPage(
                                                                                                       <br> The overall p-value, t-statistic and logFC/year was computed using the ShARP-LM model over the entire age range.
                                                                                                     "),
                                                                                ),
-                                                                               
-                                                                               withSpinner(highchartOutput("Line_signficanceAlterationsvsAge", height = "650"), 
+
+                                                                               withSpinner(highchartOutput("Line_signficanceAlterationsvsAge", height = "650"),
                                                                                            color = "#2C3E50", type = 5, size = 0.5))
                                                        )
                                               )
@@ -189,7 +189,7 @@ shinyUI(fluidPage(
                       icon = icon("heartbeat"),
                       sidebarLayout(
                         sidebarPanel2(width = 3,
-                                      pickerInput(inputId = "tissue_2", label = "Tissue", 
+                                      pickerInput(inputId = "tissue_2", label = "Tissue",
                                                   choices = c("Loading ..." = ""),
                                                   options = list(`live-search` = TRUE)),
                                       conditionalPanel(condition = "input.tissue_2 != 'All tissues' && input.tissue_2 != ''",
@@ -212,7 +212,7 @@ shinyUI(fluidPage(
                                                              div(DT::dataTableOutput(outputId = "genePeakTable", height = "800px"), style = "font-size: 90%; width: 100%",server = F))
                         ),
                         mainPanel(width = 9,
-                                  conditionalPanel(condition = "input.tissue_2 == 'All tissues' || input.tissue_2 == ''", 
+                                  conditionalPanel(condition = "input.tissue_2 == 'All tissues' || input.tissue_2 == ''",
                                                    column(width = 12, #Title different for each variable
                                                           conditionalPanel(condition = "input.variable_model_2 == 'Age'",
                                                                            tags$h4("Global age-related gene expression alterations over age across tissues"),
@@ -223,7 +223,7 @@ shinyUI(fluidPage(
                                                           conditionalPanel(condition = "input.variable_model_2 == 'Int_Age_Gender'",
                                                                            tags$h4("Global differences in age-related gene expression alterations between sexes over age across tissues"),
                                                           ),
-                                                          withSpinner(highchartOutput("AgeWavesOrganism", height = "800px"), 
+                                                          withSpinner(highchartOutput("AgeWavesOrganism", height = "800px"),
                                                                       color = "#2C3E50", type = 5, size = 0.5))),
                                   conditionalPanel(condition = "input.tissue_2 != 'All tissues' && input.tissue_2 != ''",
                                                    tabsetPanel(id = "tissue_tab", type = "pills",
@@ -251,7 +251,7 @@ shinyUI(fluidPage(
                                                                                                 highchartOutput("Line_pvaluevsAge", height = "500px"))
                                                                         )
                                                                ),
-                                                               
+
                                                                tabPanel("Enrichment",
                                                                         icon = icon("binoculars"),
                                                                         conditionalPanel(condition = "input.EnrichmentDataset == 'Reactome'",
@@ -273,10 +273,10 @@ shinyUI(fluidPage(
                                                                                                             color = "#2C3E50", type = 5, size = 0.5)),
                                                                                          tags$h4("Families of pathways"),
                                                                                          column(2, highchartOutput("Heatmap_family")),
-                                                                                         column(10, 
+                                                                                         column(10,
                                                                                                 tabsetPanel(type = "pills",
                                                                                                             tabPanel("WordCloud",
-                                                                                                                     withSpinner(highchartOutput("wordcloud_family"), 
+                                                                                                                     withSpinner(highchartOutput("wordcloud_family"),
                                                                                                                                  color = "#2C3E50", type = 5, size = 0.5)),
                                                                                                             tabPanel("Pathways",
                                                                                                                      div(DT::dataTableOutput("listPathway_family"), style = "font-size: 90%; width: 100%", server = F)
@@ -297,16 +297,16 @@ shinyUI(fluidPage(
                                                                                                 HTML("The significance of the user-specified geneset’s enrichment in differentially expressed genes is computed with Fisher’s exact tests.
                                                                                                    <br>Enter a geneset and a significance threshold value for differential expression and click on Run.
                                                                                                    <br>Click on a dot to access the contingency table associated with the respective age-window.<br>"),
-                                                                                                withSpinner(highchartOutput("Line_FishertestEnrichmentManualvsAge"), 
+                                                                                                withSpinner(highchartOutput("Line_FishertestEnrichmentManualvsAge"),
                                                                                                             color = "#2C3E50", type = 5, size = 0.5),
                                                                                                 uiOutput("geneList")))
                                                                )
-                                                               
-                                                   )                    
-                                                   
+
+                                                   )
+
                                   )
-                                  
-                                  
+
+
                         ))
              ),
              tabPanel("Module",
@@ -318,7 +318,7 @@ shinyUI(fluidPage(
                                                      icon = icon("comments"),
                                                      column(width = 12, style = "margin-bottom:50px",
                                                             HTML('<center><img src="moduleMethod.png" height="530"></center>'),
-                                                            HTML("<font size='4'><br>For each tissue, a gene co-expression network was built based on the pairwise correlation in expression of all pairs of genes. 
+                                                            HTML("<font size='4'><br>For each tissue, a gene co-expression network was built based on the pairwise correlation in expression of all pairs of genes.
                                  Groups of genes with similar expression across samples (called modules) are then identified by clustering analysis and examined to highlight enrichment in biological pathways, cell types markers or disease-associated genes.
                                         <br>A module's behaviour over age can then be inquired with the expression of its eigengene, representative of its gene expression profile.</font>"))
                                             ),
@@ -326,24 +326,24 @@ shinyUI(fluidPage(
                                                      icon = icon("chart-line"),
                                                      sidebarLayout(
                                                        sidebarPanel2(width = 3,
-                                                                     pickerInput(inputId = "tissue_module", label = "Tissue", 
+                                                                     pickerInput(inputId = "tissue_module", label = "Tissue",
                                                                                  choices = c("Brain - Cortex", "Heart - Left Ventricle", "Muscle - Skeletal", "Whole Blood"),
                                                                                  options = list(`live-search` = TRUE)),
-                                                                     pickerInput("selectedModule", "Module", choices = c("Loading ..." = ""), 
+                                                                     pickerInput("selectedModule", "Module", choices = c("Loading ..." = ""),
                                                                                  options = list(`live-search` = TRUE)),
                                                                      conditionalPanel(condition = "input.selectedModule == 'All modules' && input.modules == 'Expression'",
                                                                                       p("Enter a gene to check its belonging to a module"),
                                                                                       textInput("searchGeneInModule", label = "Gene", value = ""),
                                                                                       textOutput("geneInModules")),
                                                                      conditionalPanel(condition = "input.selectedModule == 'All modules' && input.modules == 'Diseases'",
-                                                                                      awesomeRadio(inputId = "diseaseMethod", label = "Method", inline = TRUE, checkbox = TRUE, 
+                                                                                      awesomeRadio(inputId = "diseaseMethod", label = "Method", inline = TRUE, checkbox = TRUE,
                                                                                                    choices = c("DisGeNET", "Manual"))
                                                                      ),
                                                                      conditionalPanel(condition = "input.selectedModule != 'All modules' && input.selectedModule != ''",
-                                                                                      awesomeRadio(inputId = "moduleColoredBy", label = "Colored By", 
+                                                                                      awesomeRadio(inputId = "moduleColoredBy", label = "Colored By",
                                                                                                    choices = c("Loading ...")),
                                                                                       conditionalPanel(condition = "input.moduleColoredBy == 'Technicality' && input.selectedModule != 'All modules' && input.selectedModule != '' ", uiOutput("moduleColoredByTechnicality")),
-                                                                                      awesomeRadio(inputId = "moduleShapedBy", label = "Shaped By", 
+                                                                                      awesomeRadio(inputId = "moduleShapedBy", label = "Shaped By",
                                                                                                    choices = c("Loading ...")),
                                                                                       HTML("<small>*A curve is independently fitted for each of the positive and negative conditions if at least 10 samples are known for each of them.</small>")
                                                                      ),
@@ -351,55 +351,55 @@ shinyUI(fluidPage(
                                                                      out = uiOutput("modulesOutsideBar")
                                                        ),
                                                        mainPanel(width = 9,
-                                                                 conditionalPanel(condition = "input.selectedModule == 'All modules' || input.selectedModule == ''", 
+                                                                 conditionalPanel(condition = "input.selectedModule == 'All modules' || input.selectedModule == ''",
                                                                                   tabsetPanel(id = "modules", type = "pills",
                                                                                               tabPanel("Expression",
                                                                                                        icon = icon("chart-line"),
-                                                                                                       column(width = 12, 
+                                                                                                       column(width = 12,
                                                                                                               tags$h4("Eigengene expression"),
-                                                                                                              withSpinner(manipulateWidget::combineWidgetsOutput("Heatmap_LoessMEvsAge", height = "600px"), 
+                                                                                                              withSpinner(manipulateWidget::combineWidgetsOutput("Heatmap_LoessMEvsAge", height = "600px"),
                                                                                                                           color = "#2C3E50", type = 5, size = 0.5))
-                                                                                                       
+
                                                                                               ),
                                                                                               tabPanel("Cell types",
                                                                                                        icon = icon("vial"),
-                                                                                                       column(width = 12, 
+                                                                                                       column(width = 12,
                                                                                                               tags$h4("Cell type enrichment"),
                                                                                                               HTML("The significance of each module’s enrichment in each cell type markers is computed with Fisher’s exact tests.
                                                                                                <br> The labelled values have odds ratio > 1 and p-value < 0.05. "),
-                                                                                                              withSpinner(highchartOutput("Heatmap_FisherTest_cellComposition_All", height = "600px"), 
+                                                                                                              withSpinner(highchartOutput("Heatmap_FisherTest_cellComposition_All", height = "600px"),
                                                                                                                           color = "#2C3E50", type = 5, size = 0.5))
                                                                                               ),
                                                                                               tabPanel(title = "Pathways",
                                                                                                        icon = icon("binoculars"),
-                                                                                                       column(width = 12, 
+                                                                                                       column(width = 12,
                                                                                                               tags$h4("Functional enrichment"),
                                                                                                               HTML("The significance of each module’s enrichment in <a href='https://reactome.org/' target='_blank'>REACTOME</a> pathways is computed with Fisher’s exact tests.
                                                                                                <br>Pathways are gathered into families (together with those from <a href='https://www.genome.jp/kegg/' target='_blank'>KEGG</a> and level 3 <a href='http://geneontology.org/' target='_blank'>Gene Ontology</a> Biological Processes) based on the proportion of genes in common."),
-                                                                                                              withSpinner(manipulateWidget::combineWidgetsOutput("Heatmap_moduleEnrichment_All", height = "600px"), 
+                                                                                                              withSpinner(manipulateWidget::combineWidgetsOutput("Heatmap_moduleEnrichment_All", height = "600px"),
                                                                                                                           color = "#2C3E50", type = 5, size = 0.5))
-                                                                                                       
+
                                                                                               ),
                                                                                               tabPanel(title = "Diseases",
                                                                                                        icon = icon("briefcase-medical"),
-                                                                                                       column(width = 12, 
+                                                                                                       column(width = 12,
                                                                                                               tags$h4("Disease enrichment"),
                                                                                                               conditionalPanel(condition = "input.selectedModule == 'All modules' && input.diseaseMethod == 'DisGeNET'",
-                                                                                                                               HTML("The significance of the module’s enrichment in <a href='https://www.disgenet.org/search' 
-                                                                                                           target='_blank'>DisGeNET</a> gene-disease associations (from the <code>CURATED</code> set) 
-                                                                                                           is calculated with the disgenet2r package <a href='https://www.disgenet.org/static/disgenet2r/disgenet2r.html' 
+                                                                                                                               HTML("The significance of the module’s enrichment in <a href='https://www.disgenet.org/search'
+                                                                                                           target='_blank'>DisGeNET</a> gene-disease associations (from the <code>CURATED</code> set)
+                                                                                                           is calculated with the disgenet2r package <a href='https://www.disgenet.org/static/disgenet2r/disgenet2r.html'
                                                                                                            target='_blank'>(Piñero et al.)</a>.
                                                                                                            P-values were corrected for multiple testing with Benjamini-Hochberg’s FDR.
                                                                                                            Only diseases whose enrichment is significant (adjusted p-value < 0.05) in at least one module are displayed."),
-                                                                                                                               withSpinner(highchartOutput("Heatmap_moduleDiseaseEnrichment_All", height = "600px"), 
+                                                                                                                               withSpinner(highchartOutput("Heatmap_moduleDiseaseEnrichment_All", height = "600px"),
                                                                                                                                            color = "#2C3E50", type = 5, size = 0.5)
                                                                                                               ),
                                                                                                               conditionalPanel(condition = "input.selectedModule == 'All modules' && input.diseaseMethod == 'Manual'",
                                                                                                                                HTML("The enrichment is based on the gene-disease association from <a href='https://www.disgenet.org/search' target='_blank'>DisGeNET</a> and calculated with Fisher tests.
                                                                                                                 <br>P-values were corrected for multiple testing with Benjamini-Hochberg's FDR.
-                                                                                                                Only diseases with at least 20 and up to 500 associated genes were considered. 
+                                                                                                                Only diseases with at least 20 and up to 500 associated genes were considered.
                                                                                                                 Only diseases whose enrichment is significant (adjusted p-value < 0.05) in at least one module are displayed."),
-                                                                                                                               withSpinner(highchartOutput("Heatmap_moduleDiseaseEnrichmentManual_All", height = "600px"), 
+                                                                                                                               withSpinner(highchartOutput("Heatmap_moduleDiseaseEnrichmentManual_All", height = "600px"),
                                                                                                                                            color = "#2C3E50", type = 5, size = 0.5)
                                                                                                               )
                                                                                                        )
@@ -407,29 +407,29 @@ shinyUI(fluidPage(
                                                                                               # ,
                                                                                               # tabPanel(title = "Diseases-Manual",
                                                                                               #          icon = icon("briefcase-medical"),
-                                                                                              #          column(width = 12, 
+                                                                                              #          column(width = 12,
                                                                                               #                 tags$h4("Disease enrichment"),
                                                                                               #                 HTML("The enrichment is based on the gene-disease association from <a href='https://www.disgenet.org/search' target='_blank'>DisGeNET</a> and calculated with Fisher tests."),
-                                                                                              #                 withSpinner(highchartOutput("Heatmap_moduleDiseaseEnrichmentManual_All", height = "600px"), 
+                                                                                              #                 withSpinner(highchartOutput("Heatmap_moduleDiseaseEnrichmentManual_All", height = "600px"),
                                                                                               #                             color = "#2C3E50", type = 5, size = 0.5))
                                                                                               # )
                                                                                   )
                                                                  ),
-                                                                 conditionalPanel(condition = "input.selectedModule != 'All modules' && input.selectedModule != ''", 
-                                                                                  column(width = 12, 
+                                                                 conditionalPanel(condition = "input.selectedModule != 'All modules' && input.selectedModule != ''",
+                                                                                  column(width = 12,
                                                                                          tags$h4("Eigengene expression"),
                                                                                          HTML("For data privacy purposes, a light randomization was attributed to each scattered point along the age axis. The plotted regression line (black) was fitted using the original values."),
                                                                                          withSpinner(highchartOutput("Scatter_MEvsAge", height = "400px"), color = "#2C3E50", type = 5, size = 0.5)),
                                                                                   tabsetPanel(id = "module-specific", type = "pills",
                                                                                               tabPanel("Cell types",
                                                                                                        icon = icon("vial"),
-                                                                                                       column(width = 12, 
+                                                                                                       column(width = 12,
                                                                                                               uiOutput("referenceMarker"),
                                                                                                               manipulateWidget::combineWidgetsOutput("Heatmap_FisherTest_cellComposition_One", height = "700px")
                                                                                                        )),
                                                                                               tabPanel("Pathways",
                                                                                                        icon = icon("binoculars"),
-                                                                                                       column(width = 12, 
+                                                                                                       column(width = 12,
                                                                                                               HTML("<small>Pathways significantly associated with the module are highlighted (<font color='tomato'>p-value <= 0.05</font> in red and <font color='tomato'><b> adjusted p-value <= 0.05</b></font> in bold).
                                                                                                <br>The significance of the module’s enrichment in <a href='https://reactome.org/' target='_blank'>REACTOME</a> pathways is computed with Fisher’s exact tests.
                                                                                                <br>P-values were corrected for multiple testing with Benjamini-Hochberg’s FDR.</small>"),
@@ -449,16 +449,16 @@ shinyUI(fluidPage(
                                                                                                <br>P-values were corrected for multiple testing with Benjamini-Hochberg’s FDR. Only diseases whose enrichment is significant (adjusted p-value < 0.05) in at least one module are displayed.</small>"),
                                                                                                               div(DT::dataTableOutput("DT_diseaseEnrichmentManual"), style = "font-size: 80%; width: 100%", server = F)))
                                                                                   )
-                                                                                  
-                                                                                  
+
+
                                                                  )
                                                        )
                                                      ))
                                 )))#,
-             #tabPanel("Tutorial", 
+             #tabPanel("Tutorial",
              # icon = icon("file-text"),
              # tags$iframe(style="height:800px; width:100%", src="voyAGEr-WebAppTutorial.html"))
   )
-  
-  
+
+
 ))
